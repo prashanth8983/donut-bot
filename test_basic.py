@@ -14,14 +14,14 @@ async def test_basic_functionality():
     """Test basic functionality of the web crawler components."""
     try:
         from web_crawler import WebCrawler, APIServer
-        from functions.crawler_config import CrawlerConfig
-        from functions.url_frontier import URLFrontier
-        from functions.rate_limiter import RateLimiter
-        from functions.metrics import CrawlerMetrics
-        from functions.bloom_filter import BloomFilter
-        from functions.content_extractor import ContentExtractor
-        from functions.robots_checker import RobotsChecker
-        from functions.url_utils import normalize_url
+        from donutbot.crawler_config import CrawlerConfig
+        from donutbot.url_frontier import URLFrontier
+        from donutbot.rate_limiter import RateLimiter
+        from donutbot.metrics import CrawlerMetrics
+        from donutbot.bloom_filter import BloomFilter
+        from donutbot.content_extractor import ContentExtractor
+        from donutbot.robots_checker import RobotsChecker
+        from donutbot.url_utils import normalize_url
         
         print("✓ All imports successful")
         

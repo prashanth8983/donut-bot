@@ -2,9 +2,9 @@ import aiohttp
 import asyncio
 from urllib.parse import urlparse, urljoin
 from urllib.robotparser import RobotFileParser
-from functions.crawler_config import CrawlerConfig
-from functions.rate_limiter import RateLimiter
-from functions.url_utils import normalize_url
+from donutbot.crawler_config import CrawlerConfig
+from donutbot.rate_limiter import RateLimiter
+from donutbot.url_utils import normalize_url
 import time
 
 class RobotsChecker:

@@ -1,13 +1,13 @@
 """Web Crawler Module"""
 
 from .web_crawler import WebCrawler
-from functions.crawler_config import CrawlerConfig
-from functions.url_frontier import URLFrontier
-from functions.robots_checker import RobotsChecker
-from functions.content_extractor import ContentExtractor
-from functions.rate_limiter import RateLimiter
-from functions.bloom_filter import BloomFilter
-from functions.metrics import CrawlerMetrics
+from donutbot.crawler_config import CrawlerConfig
+from donutbot.url_frontier import URLFrontier
+from donutbot.robots_checker import RobotsChecker
+from donutbot.content_extractor import ContentExtractor
+from donutbot.rate_limiter import RateLimiter
+from donutbot.bloom_filter import BloomFilter
+from donutbot.metrics import CrawlerMetrics
 from functions.exceptions import (
     CrawlError,
     RobotsError,

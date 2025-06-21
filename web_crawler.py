@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
-Asynchronous Web Crawler with API and optional local file saving.
-Ensures output is either to Kafka OR local files, not both.
-Includes API endpoints for managing allowed domains and flushing crawl status.
+Advanced Web Crawler with Redis-based URL Frontier, Bloom Filter, and Kafka Integration
+Supports distributed crawling, rate limiting, robots.txt compliance, and comprehensive metrics.
 """
 
 import asyncio
@@ -20,16 +19,16 @@ import hashlib
 from pathlib import Path
 import yaml
 
-from functions.crawler_config import CrawlerConfig  # Referencing updated config
-from functions.url_frontier import URLFrontier
-from functions.robots_checker import RobotsChecker
-from functions.content_extractor import ContentExtractor
-from functions.rate_limiter import RateLimiter
-from functions.bloom_filter import BloomFilter
-from functions.exceptions import CrawlError, RobotsError, RateLimitError
-from functions.metrics import CrawlerMetrics
+from donutbot.crawler_config import CrawlerConfig  # Referencing updated config
+from donutbot.url_frontier import URLFrontier
+from donutbot.robots_checker import RobotsChecker
+from donutbot.content_extractor import ContentExtractor
+from donutbot.rate_limiter import RateLimiter
+from donutbot.bloom_filter import BloomFilter
+from donutbot.exceptions import CrawlError, RobotsError, RateLimitError
+from donutbot.metrics import CrawlerMetrics
 from aiokafka import AIOKafkaProducer
-from functions.url_utils import normalize_url
+from donutbot.url_utils import normalize_url
 
 import os
 import sys

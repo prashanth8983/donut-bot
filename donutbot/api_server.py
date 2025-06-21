@@ -18,7 +18,12 @@ from aiohttp.web import Request, Response, json_response
 from .crawler_config import CrawlerConfig
 from .exceptions import CrawlError, ConfigurationError
 from .url_utils import normalize_url
-from .web_crawler import WebCrawler
+import sys
+import os
+
+# Add the parent directory to the path to import web_crawler
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from web_crawler import WebCrawler
 
 
 class CrawlerAPIServer:
@@ -76,24 +81,6 @@ class CrawlerAPIServer:
         self.app.router.add_get('/api/v1/results', self.get_results)
         self.app.router.add_get('/api/v1/results/{url_hash}', self.get_result_by_url)
         self.app.router.add_delete('/api/v1/results', self.clear_results)
-        
-        # OPTIONS routes for CORS preflight
-        for route in self.app.router.routes():
-            if hasattr(route, 'resource'):
-                path = route.resource.canonical
-                if path:
-                    self.app.router.add_route("OPTIONS", path, self.handle_options)
-    
-    async def handle_options(self, request: Request) -> Response:
-        """Handle CORS preflight requests."""
-        return web.Response(
-            status=200,
-            headers={
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-            }
-        )
     
     async def start_crawler(self, request: Request) -> Response:
         """Start the crawler with optional configuration."""

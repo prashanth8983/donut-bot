@@ -11,6 +11,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY api_crawler.py .
+COPY web_crawler.py .
 COPY donutbot/ ./donutbot/
 
 RUN mkdir -p /app/logs
