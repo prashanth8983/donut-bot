@@ -1,0 +1,207 @@
+version: '3.8'
+
+services:
+  # Redis for URL frontier and state management
+  redis:
+    image: redis:7-alpine
+    container_name: donut-bot-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - donut-bot-network
+    restart: unless-stopped
+
+  # Zookeeper for Kafka
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: donut-bot-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_logs:/var/lib/zookeeper/log
+    healthcheck:
+      test: ["CMD-SHELL", "echo ruok | nc localhost 2181 | grep imok"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - donut-bot-network
+    restart: unless-stopped
+
+  # Kafka for document streaming
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: donut-bot-kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      - "9092:9092"
+      - "9101:9101"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_JMX_PORT: 9101
+      KAFKA_JMX_HOSTNAME: localhost
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_DELETE_TOPIC_ENABLE: 'true'
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - donut-bot-network
+    restart: unless-stopped
+
+  # Kafka UI for monitoring (optional)
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: donut-bot-kafka-ui
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: donut-bot-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    networks:
+      - donut-bot-network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+  # Redis Commander for Redis monitoring (optional)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: donut-bot-redis-commander
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    networks:
+      - donut-bot-network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+  # Main web crawler application
+  donut-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: donut-bot-crawler
+    depends_on:
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8089:8089"
+    environment:
+      # API Configuration
+      API_HOST: 0.0.0.0
+      API_PORT: 8089
+      LOG_LEVEL: INFO
+      
+      # Redis Configuration
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+      REDIS_PASSWORD: ""
+      
+      # Kafka Configuration
+      KAFKA_BROKERS: kafka:29092
+      OUTPUT_TOPIC: raw-documents
+      ENABLE_KAFKA_OUTPUT: "true"
+      ENABLE_LOCAL_SAVE: "false"
+      
+      # Crawler Configuration
+      WORKERS: 3
+      MAX_DEPTH: 3
+      MAX_PAGES: 1000
+      DEFAULT_DELAY: 1.0
+      RESPECT_ROBOTS_TXT: "true"
+      ALLOW_REDIRECTS: "true"
+      
+      # Allowed domains (comma-separated)
+      ALLOWED_DOMains: "example.com,test.com,demo.org"
+      
+      # Python configuration
+      PYTHONUNBUFFERED: 1
+    volumes:
+      - ./logs:/app/logs
+      - ./output:/app/crawler_output
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8089/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - donut-bot-network
+    restart: unless-stopped
+
+  # Nginx reverse proxy (optional)
+  nginx:
+    image: nginx:alpine
+    container_name: donut-bot-nginx
+    depends_on:
+      donut-bot:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    networks:
+      - donut-bot-network
+    restart: unless-stopped
+    profiles:
+      - production
+
+volumes:
+  redis_data:
+    driver: local
+  zookeeper_data:
+    driver: local
+  zookeeper_logs:
+    driver: local
+  kafka_data:
+    driver: local
+
+networks:
+  donut-bot-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16 
