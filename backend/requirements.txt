@@ -1,0 +1,46 @@
+# FastAPI and ASGI server
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Database
+motor==3.3.2
+pymongo==4.6.0
+
+# Redis
+redis==5.0.1
+aioredis==2.0.1
+
+# HTTP client
+aiohttp==3.9.1
+httpx==0.25.2
+
+# HTML parsing
+beautifulsoup4==4.12.2
+lxml==4.9.3
+
+# URL handling
+urllib3==2.1.0
+validators==0.22.0
+
+# Kafka (optional)
+aiokafka==0.9.0
+
+# Bloom filter
+pybloom-live==3.0.0
+
+# Logging
+structlog==23.2.0
+
+# Environment and configuration
+python-dotenv==1.0.0
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+
+# Development
+black==23.11.0
+isort==5.12.0
+flake8==6.1.0
