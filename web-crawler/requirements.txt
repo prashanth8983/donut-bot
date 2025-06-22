@@ -1,0 +1,6 @@
+aiohttp[brotli]>=3.9.0
+aiokafka>=0.8.0
+beautifulsoup4==4.12.2
+bitarray==2.8.1
+pyyaml==6.0.1
+redis==5.0.1

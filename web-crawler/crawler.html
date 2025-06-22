@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Crawler Control UI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        .metric-value { font-weight: 600; color: #1D4ED8; /* blue-700 */ }
+        .metric-value-small { font-weight: 500; color: #374151; /* gray-700 */ display: block; max-height: 60px; overflow-y: auto; font-size: 0.8rem;}
+        .status-dot {
+            height: 10px;
+            width: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        .status-running { background-color: #22C55E; /* green-500 */ }
+        .status-stopped { background-color: #EF4444; /* red-500 */ }
+        .status-unknown { background-color: #F59E0B; /* amber-500 */ }
+         #toast-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .toast {
+            padding: 1rem;
+            border-radius: 0.5rem;
+            color: white;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            max-width: 350px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .toast-success { background-color: #22C55E; /* green-500 */ }
+        .toast-error { background-color: #EF4444; /* red-500 */ }
+        .toast-info { background-color: #3B82F6; /* blue-500 */ }
+        .domain-tag {
+            background-color: #E0E7FF; /* indigo-100 */
+            color: #3730A3; /* indigo-800 */
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.375rem; /* rounded-md */
+            font-size: 0.875rem; /* text-sm */
+            margin-right: 0.5rem;
+            margin-bottom: 0.5rem;
+            display: inline-flex;
+            align-items: center;
+        }
+        .remove-domain-btn {
+            background: none;
+            border: none;
+            color: #C81E1E; /* red-700 */
+            margin-left: 0.5rem;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .remove-domain-btn:hover {
+            color: #991B1B; /* red-900 */
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 p-4 md:p-8">
+    <div class="container mx-auto max-w-4xl">
+        <header class="mb-8 text-center">
+            <h1 class="text-4xl font-bold text-slate-900">Web Crawler Dashboard</h1>
+            <p class="text-slate-600">Monitor status, manage domains, and control crawl data.</p>
+        </header>
+
+        <section class="bg-white p-6 rounded-lg shadow-lg mb-8">
+            <h2 class="text-2xl font-semibold mb-4 text-slate-700 border-b pb-2">Crawler Status</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div><span class="status-dot status-unknown" id="crawler-running-dot"></span>Crawler Running: <span class="metric-value" id="status-running">Fetching...</span></div>
+                <div>Uptime: <span class="metric-value" id="status-uptime">N/A</span></div>
+                <div>Pages Crawled: <span class="metric-value" id="status-crawled">N/A</span> / <span id="status-max-pages">N/A</span></div>
+                <div>Pages Remaining (Limit): <span class="metric-value" id="status-pages-remaining">N/A</span></div>
+                <div>Avg. Pages/Sec: <span class="metric-value" id="status-rate">N/A</span></div>
+                <div>Frontier Queue Size: <span class="metric-value" id="status-queue">N/A</span></div>
+                <div>URLs in Processing: <span class="metric-value" id="status-processing">N/A</span></div>
+                <div>Completed (Redis): <span class="metric-value" id="status-completed-redis">N/A</span></div>
+                <div>Seen (Redis): <span class="metric-value" id="status-seen-redis">N/A</span></div>
+                <div>Bloom Filter Items: <span class="metric-value" id="status-bloom">N/A</span></div>
+                <div>Robots Denied: <span class="metric-value" id="status-robots">N/A</span></div>
+                <div>Total Errors: <span class="metric-value" id="status-errors">N/A</span></div>
+                <div>Active Workers Configured: <span class="metric-value" id="status-workers">N/A</span></div>
+                <div class="md:col-span-2">Allowed Domains: <span class="metric-value-small" id="status-allowed-domains">N/A</span></div>
+                <div>Last Update (UTC): <span class="metric-value" id="status-last-update">N/A</span></div>
+            </div>
+             <div class="mt-4 text-xs text-slate-500">
+                API Endpoint: <input type="text" id="apiBaseUrl" value="http://localhost:8089" class="p-1 border rounded-md w-1/2 text-xs">
+                (Status updates every <span id="refreshIntervalSeconds">5</span> seconds)
+            </div>
+        </section>
+
+        <section class="bg-white p-6 rounded-lg shadow-lg mb-8">
+            <h2 class="text-2xl font-semibold mb-4 text-slate-700 border-b pb-2">Add New Seed URLs</h2>
+            <form id="addSeedsForm">
+                <div class="mb-4">
+                    <label for="seedUrls" class="block text-sm font-medium text-slate-700 mb-1">Enter Seed URLs (one per line):</label>
+                    <textarea id="seedUrls" name="seedUrls" rows="4" class="w-full p-3 border border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" placeholder="http://example.com/page1&#x0a;https://another.example.org/path"></textarea>
+                </div>
+                <div class="flex items-center justify-between">
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-md shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">
+                        Add Seeds to Queue
+                    </button>
+                    <div id="submitSeedsStatus" class="text-sm"></div>
+                </div>
+            </form>
+        </section>
+
+        <section class="bg-white p-6 rounded-lg shadow-lg mb-8">
+            <h2 class="text-2xl font-semibold mb-4 text-slate-700 border-b pb-2">Manage Allowed Domains</h2>
+            <div class="mb-4">
+                <h3 class="text-lg font-medium text-slate-600 mb-2">Current Allowed Domains:</h3>
+                <div id="currentAllowedDomains" class="flex flex-wrap gap-2 p-2 border border-slate-200 rounded-md min-h-[40px] bg-slate-50">
+                    <span class="text-slate-400">Loading...</span>
+                </div>
+            </div>
+            <form id="manageDomainsForm" class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                <div class="md:col-span-2">
+                    <label for="domainsInput" class="block text-sm font-medium text-slate-700 mb-1">Domains (comma or newline separated):</label>
+                    <textarea id="domainsInput" name="domainsInput" rows="3" class="w-full p-3 border border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm" placeholder="newdomain.com, another.org"></textarea>
+                </div>
+                <div class="flex flex-col space-y-2 md:space-y-0 md:flex-row md:space-x-2">
+                     <button type="button" id="addDomainsBtn" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md shadow-md">Add</button>
+                     <button type="button" id="replaceDomainsBtn" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-semibold py-2 px-4 rounded-md shadow-md">Replace</button>
+                </div>
+            </form>
+             <div id="manageDomainsStatus" class="text-sm mt-2"></div>
+        </section>
+
+        <section class="bg-white p-6 rounded-lg shadow-lg">
+            <h2 class="text-2xl font-semibold mb-4 text-slate-700 border-b pb-2">Crawler Data Management</h2>
+            <div class="space-y-3 mb-4 text-sm">
+                <label class="flex items-center">
+                    <input type="checkbox" id="flushRedisCompleted" class="form-checkbox h-5 w-5 text-blue-600 border-slate-300 rounded focus:ring-blue-500" checked>
+                    <span class="ml-2 text-slate-700">Clear Completed URLs (Redis)</span>
+                </label>
+                <label class="flex items-center">
+                    <input type="checkbox" id="flushRedisSeen" class="form-checkbox h-5 w-5 text-blue-600 border-slate-300 rounded focus:ring-blue-500" checked>
+                    <span class="ml-2 text-slate-700">Clear Seen URLs (Redis)</span>
+                </label>
+                <label class="flex items-center">
+                    <input type="checkbox" id="flushBloomFilter" class="form-checkbox h-5 w-5 text-blue-600 border-slate-300 rounded focus:ring-blue-500" checked>
+                    <span class="ml-2 text-slate-700">Clear Bloom Filter</span>
+                </label>
+                 <p class="text-xs text-slate-500 pt-2">Advanced (use with caution):</p>
+                 <label class="flex items-center">
+                    <input type="checkbox" id="flushRedisProcessing" class="form-checkbox h-5 w-5 text-orange-600 border-slate-300 rounded focus:ring-orange-500">
+                    <span class="ml-2 text-slate-700">Clear Processing URLs (Redis)</span>
+                </label>
+                <label class="flex items-center">
+                    <input type="checkbox" id="flushRedisQueue" class="form-checkbox h-5 w-5 text-red-600 border-slate-300 rounded focus:ring-red-500">
+                    <span class="ml-2 text-slate-700">Clear Entire URL Queue (Redis)</span>
+                </label>
+            </div>
+             <button type="button" id="flushStatusBtn" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-6 rounded-md shadow-md transition duration-150 ease-in-out">
+                Flush Selected Data
+            </button>
+            <div id="flushStatusMessage" class="text-sm mt-2"></div>
+        </section>
+
+    </div>
+
+    <div id="toast-container"></div>
+
+    <script>
+        const REFRESH_INTERVAL_MS = 5000;
+        document.getElementById('refreshIntervalSeconds').textContent = REFRESH_INTERVAL_MS / 1000;
+
+        const apiBaseUrlInput = document.getElementById('apiBaseUrl');
+        const currentAllowedDomainsDiv = document.getElementById('currentAllowedDomains');
+        const domainsInputEl = document.getElementById('domainsInput');
+        const addDomainsBtn = document.getElementById('addDomainsBtn');
+        const replaceDomainsBtn = document.getElementById('replaceDomainsBtn');
+        const manageDomainsStatusEl = document.getElementById('manageDomainsStatus');
+        const flushStatusBtn = document.getElementById('flushStatusBtn');
+        const flushStatusMessageEl = document.getElementById('flushStatusMessage');
+
+        function getApiBaseUrl() {
+            return apiBaseUrlInput.value.trim() || 'http://localhost:8089';
+        }
+
+        function showToast(message, type = 'info', duration = 4000) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            toast.offsetHeight; // Trigger reflow
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    if (toast.parentNode === container) {
+                         container.removeChild(toast);
+                    }
+                }, 300);
+            }, duration);
+        }
+
+        async function fetchCrawlerStatus() {
+            const statusRunningEl = document.getElementById('status-running');
+            const statusDotEl = document.getElementById('crawler-running-dot');
+            const statusAllowedDomainsEl = document.getElementById('status-allowed-domains');
+            try {
+                const response = await fetch(`${getApiBaseUrl()}/crawler_status`);
+                if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+                const data = await response.json();
+
+                statusRunningEl.textContent = data.crawler_running ? 'Running' : 'Stopped / Not Initialized';
+                statusDotEl.className = 'status-dot';
+                if (data.crawler_running === true) statusDotEl.classList.add('status-running');
+                else if (data.crawler_running === false) statusDotEl.classList.add('status-stopped');
+                else statusDotEl.classList.add('status-unknown');
+
+                document.getElementById('status-uptime').textContent = `${data.uptime_seconds.toFixed(0)}s`;
+                document.getElementById('status-crawled').textContent = data.pages_crawled_total;
+                document.getElementById('status-max-pages').textContent = data.max_pages_configured;
+                document.getElementById('status-pages-remaining').textContent = data.pages_remaining_in_limit;
+                document.getElementById('status-rate').textContent = data.avg_pages_per_second;
+                document.getElementById('status-queue').textContent = data.frontier_queue_size;
+                document.getElementById('status-processing').textContent = data.urls_in_processing;
+                document.getElementById('status-completed-redis').textContent = data.urls_completed_redis;
+                document.getElementById('status-seen-redis').textContent = data.urls_seen_redis;
+                document.getElementById('status-bloom').textContent = data.bloom_filter_items;
+                document.getElementById('status-robots').textContent = data.robots_denied_count;
+                document.getElementById('status-errors').textContent = data.total_errors_count;
+                document.getElementById('status-workers').textContent = data.active_workers_configured; // Matched API key
+                document.getElementById('status-last-update').textContent = new Date(data.current_time_utc).toLocaleTimeString();
+                
+                // Display allowed domains from status
+                if (data.allowed_domains && data.allowed_domains.length > 0) {
+                    statusAllowedDomainsEl.textContent = data.allowed_domains.join(', ');
+                } else if (Array.isArray(data.allowed_domains) && data.allowed_domains.length === 0) {
+                    statusAllowedDomainsEl.textContent = 'None (all domains allowed)';
+                } else {
+                     statusAllowedDomainsEl.textContent = 'N/A';
+                }
+
+
+            } catch (error) {
+                console.error('Error fetching crawler status:', error);
+                statusRunningEl.textContent = 'Error fetching status';
+                statusDotEl.className = 'status-dot status-unknown';
+                statusAllowedDomainsEl.textContent = 'Error';
+                showToast(`Error fetching status: ${error.message}`, 'error');
+            }
+        }
+
+        document.getElementById('addSeedsForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+            const submitStatusEl = document.getElementById('submitSeedsStatus');
+            submitStatusEl.textContent = 'Submitting...';
+            submitStatusEl.className = 'text-sm text-slate-500';
+
+            const urlsText = document.getElementById('seedUrls').value;
+            const urlsArray = urlsText.split(/\r?\n/).map(url => url.trim()).filter(url => url.length > 0);
+
+            if (urlsArray.length === 0) {
+                submitStatusEl.textContent = 'Please enter at least one URL.';
+                submitStatusEl.className = 'text-sm text-amber-600';
+                showToast('No URLs provided to submit.', 'info');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${getApiBaseUrl()}/add_seeds`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ urls: urlsArray }),
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    submitStatusEl.textContent = result.message || 'Request processed.';
+                    submitStatusEl.className = 'text-sm text-green-600';
+                    showToast(result.message || `Added: ${result.added_count}, Skipped: ${result.skipped_count}`, 'success');
+                    document.getElementById('seedUrls').value = '';
+                } else {
+                    submitStatusEl.textContent = `Error: ${result.error || response.statusText}`;
+                    submitStatusEl.className = 'text-sm text-red-600';
+                    showToast(`Error submitting seeds: ${result.error || response.statusText}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error submitting seeds:', error);
+                submitStatusEl.textContent = 'Network or API error.';
+                submitStatusEl.className = 'text-sm text-red-600';
+                showToast(`Network or API error: ${error.message}`, 'error');
+            }
+        });
+
+        // --- Allowed Domains Management ---
+        function renderAllowedDomains(domains) {
+            currentAllowedDomainsDiv.innerHTML = ''; // Clear previous
+            if (domains && domains.length > 0) {
+                domains.forEach(domain => {
+                    const tag = document.createElement('span');
+                    tag.className = 'domain-tag';
+                    tag.textContent = domain;
+                    const removeBtn = document.createElement('button');
+                    removeBtn.className = 'remove-domain-btn';
+                    removeBtn.innerHTML = '&times;'; // x icon
+                    removeBtn.title = `Remove ${domain}`;
+                    removeBtn.onclick = () => handleDomainAction('remove', [domain]);
+                    tag.appendChild(removeBtn);
+                    currentAllowedDomainsDiv.appendChild(tag);
+                });
+            } else {
+                currentAllowedDomainsDiv.innerHTML = '<span class="text-slate-500">No specific domains allowed (crawler may allow all or be restricted by initial seeds).</span>';
+            }
+        }
+
+        async function fetchAllowedDomains() {
+            try {
+                const response = await fetch(`${getApiBaseUrl()}/config/allowed_domains`);
+                if (!response.ok) throw new Error(`HTTP error! ${response.status}`);
+                const data = await response.json();
+                renderAllowedDomains(data.allowed_domains);
+            } catch (error) {
+                console.error('Error fetching allowed domains:', error);
+                currentAllowedDomainsDiv.innerHTML = '<span class="text-red-500">Error fetching domains.</span>';
+                showToast(`Error fetching allowed domains: ${error.message}`, 'error');
+            }
+        }
+        
+        async function handleDomainAction(action, domainsList) {
+            if (!domainsList || domainsList.length === 0) {
+                showToast('No domains specified for action.', 'info');
+                return;
+            }
+            manageDomainsStatusEl.textContent = 'Processing...';
+            manageDomainsStatusEl.className = 'text-sm text-slate-500';
+
+            try {
+                const response = await fetch(`${getApiBaseUrl()}/config/allowed_domains`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: action, domains: domainsList }),
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    manageDomainsStatusEl.textContent = result.message || `Domains ${action}ed.`;
+                    manageDomainsStatusEl.className = 'text-sm text-green-600';
+                    showToast(result.message || `Domains ${action}ed successfully.`, 'success');
+                    renderAllowedDomains(result.allowed_domains); // Update display with new list
+                    fetchCrawlerStatus(); // Refresh main status to show updated allowed domains there too
+                    if (action === 'add' || action === 'replace') domainsInputEl.value = ''; // Clear input
+                } else {
+                    manageDomainsStatusEl.textContent = `Error: ${result.error || response.statusText}`;
+                    manageDomainsStatusEl.className = 'text-sm text-red-600';
+                    showToast(`Error ${action}ing domains: ${result.error || response.statusText}`, 'error');
+                }
+            } catch (error) {
+                console.error(`Error ${action}ing domains:`, error);
+                manageDomainsStatusEl.textContent = 'Network or API error.';
+                manageDomainsStatusEl.className = 'text-sm text-red-600';
+                showToast(`Network or API error: ${error.message}`, 'error');
+            }
+        }
+
+        addDomainsBtn.addEventListener('click', () => {
+            const domainsText = domainsInputEl.value;
+            const domainsArray = domainsText.split(/[\s,;\n]+/).map(d => d.trim()).filter(d => d.length > 0);
+            handleDomainAction('add', domainsArray);
+        });
+
+        replaceDomainsBtn.addEventListener('click', () => {
+            const domainsText = domainsInputEl.value;
+            const domainsArray = domainsText.split(/[\s,;\n]+/).map(d => d.trim()).filter(d => d.length > 0);
+            if (confirm('Are you sure you want to replace all allowed domains with this list?')) {
+                 handleDomainAction('replace', domainsArray);
+            }
+        });
+
+        // --- Flush Crawl Status ---
+        flushStatusBtn.addEventListener('click', async () => {
+            flushStatusMessageEl.textContent = 'Processing flush request...';
+            flushStatusMessageEl.className = 'text-sm text-slate-500';
+
+            const payload = {
+                redis_completed: document.getElementById('flushRedisCompleted').checked,
+                redis_seen: document.getElementById('flushRedisSeen').checked,
+                bloom_filter: document.getElementById('flushBloomFilter').checked,
+                redis_processing: document.getElementById('flushRedisProcessing').checked,
+                redis_queue: document.getElementById('flushRedisQueue').checked,
+            };
+            
+            if (!payload.redis_completed && !payload.redis_seen && !payload.bloom_filter && !payload.redis_processing && !payload.redis_queue) {
+                showToast('No data types selected for flushing.', 'info');
+                flushStatusMessageEl.textContent = 'Select at least one data type to flush.';
+                flushStatusMessageEl.className = 'text-sm text-amber-600';
+                return;
+            }
+
+            if (payload.redis_queue || payload.redis_processing) {
+                if (!confirm("Warning: Flushing the 'Processing URLs' or the entire 'URL Queue' can disrupt an active crawl. Are you sure you want to proceed?")) {
+                    flushStatusMessageEl.textContent = 'Flush operation cancelled by user.';
+                    flushStatusMessageEl.className = 'text-sm text-slate-500';
+                    return;
+                }
+            }
+
+
+            try {
+                const response = await fetch(`${getApiBaseUrl()}/crawler/flush_status`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    flushStatusMessageEl.textContent = result.message || 'Flush request successful.';
+                    flushStatusMessageEl.className = 'text-sm text-green-600';
+                    showToast(result.message || 'Crawl data flushed successfully.', 'success');
+                    console.log('Flush details:', result.details);
+                    fetchCrawlerStatus(); // Refresh status to see updated counts
+                } else {
+                    flushStatusMessageEl.textContent = `Error: ${result.error || response.statusText}`;
+                    flushStatusMessageEl.className = 'text-sm text-red-600';
+                    showToast(`Error flushing data: ${result.error || response.statusText}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error flushing crawl status:', error);
+                flushStatusMessageEl.textContent = 'Network or API error during flush.';
+                flushStatusMessageEl.className = 'text-sm text-red-600';
+                showToast(`Network or API error: ${error.message}`, 'error');
+            }
+        });
+
+
+        // Initial fetches
+        fetchCrawlerStatus();
+        fetchAllowedDomains(); // Fetch allowed domains on load
+        setInterval(fetchCrawlerStatus, REFRESH_INTERVAL_MS);
+        // No need to repeatedly fetch allowed domains unless user interacts,
+        // or if another source could change them.
+    </script>
+</body>
+</html>
