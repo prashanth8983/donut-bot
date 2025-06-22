@@ -4,51 +4,56 @@ services:
   # Redis for URL frontier and state management
   redis:
     image: redis:7-alpine
-    container_name: donut-bot-redis
+    container_name: webcrawler-redis
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
     networks:
-      - donut-bot-network
+      - webcrawler-network
     restart: unless-stopped
+
+  # MongoDB for job management and persistent storage
+  mongodb:
+    image: mongo:6
+    container_name: webcrawler-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password123
+      MONGO_INITDB_DATABASE: webcrawler
+    volumes:
+      - mongodb_data:/data/db
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    restart: unless-stopped
+    networks:
+      - webcrawler-network
 
   # Zookeeper for Kafka
   zookeeper:
     image: confluentinc/cp-zookeeper:7.4.0
-    container_name: donut-bot-zookeeper
+    container_name: webcrawler-zookeeper
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+      ZOO_4LW_COMMANDS_WHITELIST: "ruok, conf, stat"
     ports:
       - "2181:2181"
     volumes:
       - zookeeper_data:/var/lib/zookeeper/data
       - zookeeper_logs:/var/lib/zookeeper/log
-    healthcheck:
-      test: ["CMD-SHELL", "echo ruok | nc localhost 2181 | grep imok"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
     networks:
-      - donut-bot-network
+      - webcrawler-network
     restart: unless-stopped
 
   # Kafka for document streaming
   kafka:
     image: confluentinc/cp-kafka:7.4.0
-    container_name: donut-bot-kafka
+    container_name: webcrawler-kafka
     depends_on:
-      zookeeper:
-        condition: service_healthy
+      - zookeeper
     ports:
       - "9092:9092"
       - "9101:9101"
@@ -57,6 +62,8 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
@@ -67,31 +74,24 @@ services:
       KAFKA_DELETE_TOPIC_ENABLE: 'true'
     volumes:
       - kafka_data:/var/lib/kafka/data
-    healthcheck:
-      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
     networks:
-      - donut-bot-network
+      - webcrawler-network
     restart: unless-stopped
 
   # Kafka UI for monitoring (optional)
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
-    container_name: donut-bot-kafka-ui
+    container_name: webcrawler-kafka-ui
     depends_on:
-      kafka:
-        condition: service_healthy
+      - kafka
     ports:
       - "8080:8080"
     environment:
-      KAFKA_CLUSTERS_0_NAME: donut-bot-cluster
+      KAFKA_CLUSTERS_0_NAME: webcrawler-cluster
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
     networks:
-      - donut-bot-network
+      - webcrawler-network
     restart: unless-stopped
     profiles:
       - monitoring
@@ -99,31 +99,29 @@ services:
   # Redis Commander for Redis monitoring (optional)
   redis-commander:
     image: rediscommander/redis-commander:latest
-    container_name: donut-bot-redis-commander
+    container_name: webcrawler-redis-commander
     depends_on:
-      redis:
-        condition: service_healthy
+      - redis
     ports:
       - "8081:8081"
     environment:
       REDIS_HOSTS: local:redis:6379
     networks:
-      - donut-bot-network
+      - webcrawler-network
     restart: unless-stopped
     profiles:
       - monitoring
 
-  # Main web crawler application
-  donut-bot:
+  # Main web crawler API server
+  webcrawler-api:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
-    container_name: donut-bot-crawler
+    container_name: webcrawler-api
     depends_on:
-      redis:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
+      - redis
+      - kafka
+      - mongodb
     ports:
       - "8089:8089"
     environment:
@@ -153,55 +151,46 @@ services:
       ALLOW_REDIRECTS: "true"
       
       # Allowed domains (comma-separated)
-      ALLOWED_DOMains: "example.com,test.com,demo.org"
+      ALLOWED_DOMAINS: "example.com,test.com,demo.org"
       
       # Python configuration
       PYTHONUNBUFFERED: 1
+      
+      # MongoDB Configuration
+      MONGO_URI: mongodb://admin:password123@mongodb:27017/webcrawler?authSource=admin
     volumes:
       - ./logs:/app/logs
       - ./output:/app/crawler_output
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8089/api/v1/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
     networks:
-      - donut-bot-network
+      - webcrawler-network
     restart: unless-stopped
+    command: python api_crawler.py
 
-  # Nginx reverse proxy (optional)
-  nginx:
-    image: nginx:alpine
-    container_name: donut-bot-nginx
-    depends_on:
-      donut-bot:
-        condition: service_healthy
+  # Frontend React App
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=http://localhost:8089
+    container_name: webcrawler-frontend
     ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./ssl:/etc/nginx/ssl:ro
-    networks:
-      - donut-bot-network
+      - "3000:80"
+    environment:
+      - VITE_API_URL=http://localhost:8089
+    depends_on:
+      - webcrawler-api
     restart: unless-stopped
-    profiles:
-      - production
+    networks:
+      - webcrawler-network
 
 volumes:
   redis_data:
-    driver: local
+  mongodb_data:
   zookeeper_data:
-    driver: local
   zookeeper_logs:
-    driver: local
   kafka_data:
-    driver: local
 
 networks:
-  donut-bot-network:
+  webcrawler-network:
     driver: bridge
-    ipam:
-      config:
-        - subnet: 172.20.0.0/16 

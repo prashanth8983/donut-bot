@@ -1,352 +1,138 @@
-# Donut Bot - API-Driven Web Crawler
+# WebCrawler Pro - Full Stack Web Crawling Platform
 
-A high-performance, asynchronous web crawler with a comprehensive REST API for complete programmatic control.
+A comprehensive web crawling platform with a modern React frontend, Python backend API, and MongoDB job management.
 
-## 🚀 Features
+## 🏗️ Project Structure
 
-- **Full API Control**: All functionality accessible via REST endpoints
-- **Asynchronous Architecture**: High-performance concurrent crawling
-- **Redis Integration**: Distributed URL frontier and state management
-- **Bloom Filter**: Efficient duplicate URL detection
-- **Rate Limiting**: Configurable per-domain rate limiting
-- **Robots.txt Support**: Respects robots.txt files
-- **Content Extraction**: Extracts titles, links, images, and metadata
-- **Kafka Integration**: Stream crawled documents to Kafka
-- **Local Storage**: Save crawled documents locally
-- **Health Monitoring**: Comprehensive health checks and metrics
-- **CORS Support**: Cross-origin request support
-- **Docker Ready**: Containerized deployment
-
-## 📋 API Endpoints
-
-### Crawler Management
-- `POST /api/v1/crawler/start` - Start the crawler with optional configuration
-- `POST /api/v1/crawler/stop` - Stop the crawler
-- `GET /api/v1/crawler/status` - Get comprehensive crawler status
-- `POST /api/v1/crawler/reset` - Reset crawler state and data
-
-### URL Management
-- `POST /api/v1/urls/add` - Add URLs to the crawler queue
-- `GET /api/v1/urls/queue` - Get URL queue status
-- `DELETE /api/v1/urls/clear` - Clear URL queue and data
-
-### Configuration Management
-- `GET /api/v1/config` - Get current configuration
-- `PUT /api/v1/config` - Update configuration
-- `GET /api/v1/config/domains` - Get allowed domains
-- `PUT /api/v1/config/domains` - Update allowed domains
-
-### Monitoring & Metrics
-- `GET /api/v1/metrics` - Get crawler metrics
-- `GET /api/v1/stats` - Get comprehensive statistics
-- `GET /api/v1/health` - Health check
-
-## 🛠️ Installation
-
-### Prerequisites
-- Python 3.9+
-- Redis server
-- Kafka (optional, for document streaming)
-
-### Setup
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/prashanth8983/donut-bot.git
-   cd donut-bot
-   ```
-
-2. **Create virtual environment**
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-3. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Start Redis**
-   ```bash
-   # Using Docker
-   docker run -d -p 6379:6379 redis:latest
-   
-   # Or install locally
-   # brew install redis  # macOS
-   # sudo apt-get install redis-server  # Ubuntu
-   ```
+```
+donut-bot/
+├── backend/                 # Python backend API
+│   ├── donutbot/           # Core crawler modules
+│   ├── web_crawler.py      # Main crawler implementation
+│   ├── api_crawler.py      # API server entry point
+│   ├── api_client_example.py
+│   ├── requirements.txt    # Python dependencies
+│   ├── Dockerfile         # Backend container
+│   ├── logs/              # Application logs
+│   └── output/            # Crawled data output
+├── frontend/               # React TypeScript frontend
+│   ├── src/               # React source code
+│   ├── public/            # Static assets
+│   ├── package.json       # Node.js dependencies
+│   └── Dockerfile         # Frontend container
+├── config/                 # Configuration files
+│   ├── docker-compose.yml # Docker orchestration
+│   ├── mongo-init.js      # MongoDB initialization
+│   └── nginx.conf         # Nginx configuration
+├── scripts/                # Utility scripts
+│   ├── start.sh           # Start all services
+│   └── stop.sh            # Stop all services
+├── docs/                   # Documentation
+│   ├── README.md          # Detailed documentation
+│   ├── DEPLOYMENT.md      # Deployment guide
+│   └── LICENSE            # Project license
+└── README.md              # This file
+```
 
 ## 🚀 Quick Start
 
-### 1. Start the API Server
+### Prerequisites
+- Docker and Docker Compose
+- Node.js 18+ (for local frontend development)
+- Python 3.11+ (for local backend development)
 
-```bash
-# Start the API server
-python api_crawler.py --host 0.0.0.0 --port 8089 --log-level INFO
-```
+### Using Docker (Recommended)
 
-### 2. Use the API Client
+1. **Start all services:**
+   ```bash
+   cd config
+   docker-compose up --build
+   ```
 
-```bash
-# Run the example client
-python api_client_example.py
-```
+2. **Access the applications:**
+   - Frontend: http://localhost:3000
+   - Backend API: http://localhost:8089
+   - Kafka UI: http://localhost:8080 (optional monitoring)
+   - Redis Commander: http://localhost:8081 (optional monitoring)
 
-### 3. Manual API Usage
+### Local Development
 
-```bash
-# Start crawler
-curl -X POST http://localhost:8089/api/v1/crawler/start \
-  -H "Content-Type: application/json" \
-  -d '{"config": {"workers": 2, "max_pages": 100}}'
+1. **Backend:**
+   ```bash
+   cd backend
+   pip install -r requirements.txt
+   python api_crawler.py
+   ```
 
-# Add URLs
-curl -X POST http://localhost:8089/api/v1/urls/add \
-  -H "Content-Type: application/json" \
-  -d '{"urls": ["https://example.com"], "priority": 1.0, "depth": 0}'
+2. **Frontend:**
+   ```bash
+   cd frontend
+   npm install
+   npm start
+   ```
 
-# Get status
-curl http://localhost:8089/api/v1/crawler/status
+## 🛠️ Features
 
-# Get metrics
-curl http://localhost:8089/api/v1/metrics
+### Backend API
+- **RESTful API** for crawler control
+- **MongoDB integration** for job management
+- **Redis caching** and queue management
+- **Kafka streaming** for data processing
+- **Health monitoring** and metrics
 
-# Stop crawler
-curl -X POST http://localhost:8089/api/v1/crawler/stop
-```
+### Frontend Dashboard
+- **Real-time monitoring** of crawler status
+- **Job management** with create, start, pause, stop
+- **Performance metrics** and analytics
+- **Modern UI** with Tailwind CSS
+- **TypeScript** for type safety
 
-## 📖 API Reference
+### Infrastructure
+- **Docker containers** for easy deployment
+- **MongoDB** for persistent job storage
+- **Redis** for caching and queues
+- **Kafka** for message streaming
+- **Optional monitoring** with Kafka UI and Redis Commander
 
-### Start Crawler
-```http
-POST /api/v1/crawler/start
-Content-Type: application/json
+## 📚 Documentation
 
-{
-  "config": {
-    "workers": 3,
-    "max_depth": 3,
-    "max_pages": 1000,
-    "default_delay": 1.0,
-    "allowed_domains": ["example.com"],
-    "respect_robots_txt": true,
-    "allow_redirects": true
-  }
-}
-```
-
-### Add URLs
-```http
-POST /api/v1/urls/add
-Content-Type: application/json
-
-{
-  "urls": ["https://example.com", "https://test.com"],
-  "priority": 0.8,
-  "depth": 0
-}
-```
-
-### Update Configuration
-```http
-PUT /api/v1/config
-Content-Type: application/json
-
-{
-  "workers": 5,
-  "max_pages": 500,
-  "default_delay": 0.5
-}
-```
-
-### Update Allowed Domains
-```http
-PUT /api/v1/config/domains
-Content-Type: application/json
-
-{
-  "action": "add",
-  "domains": ["newdomain.com", "anotherdomain.org"]
-}
-```
+- [Detailed Documentation](docs/README.md)
+- [Deployment Guide](docs/DEPLOYMENT.md)
+- [API Reference](docs/API.md)
 
 ## 🔧 Configuration
 
 ### Environment Variables
-- `API_HOST` - API server host (default: 0.0.0.0)
-- `API_PORT` - API server port (default: 8089)
-- `LOG_LEVEL` - Logging level (default: INFO)
-- `REDIS_HOST` - Redis host (default: localhost)
-- `REDIS_PORT` - Redis port (default: 6379)
-- `KAFKA_BROKERS` - Kafka brokers (default: localhost:9092)
+- `MONGO_URI`: MongoDB connection string
+- `REDIS_URL`: Redis connection string
+- `KAFKA_BOOTSTRAP_SERVERS`: Kafka servers
+- `API_HOST`: API server host
+- `API_PORT`: API server port
 
-### Configuration Options
-- `workers` - Number of concurrent workers
-- `max_depth` - Maximum crawl depth
-- `max_pages` - Maximum pages to crawl (0 = unlimited)
-- `default_delay` - Default delay between requests
-- `allowed_domains` - List of allowed domains
-- `respect_robots_txt` - Whether to respect robots.txt
-- `allow_redirects` - Whether to follow redirects
-- `enable_kafka_output` - Enable Kafka document streaming
-- `enable_local_save` - Enable local document saving
-
-## 🐳 Docker Deployment
-
-### Build and Run
-```bash
-# Build the image
-docker build -t donut-bot .
-
-# Run with Redis
-docker run -d --name redis redis:latest
-docker run -d --name donut-bot --link redis \
-  -p 8089:8089 \
-  -e REDIS_HOST=redis \
-  donut-bot
-```
-
-### Docker Compose
-```yaml
-version: '3.8'
-services:
-  redis:
-    image: redis:latest
-    ports:
-      - "6379:6379"
-  
-  donut-bot:
-    build: .
-    ports:
-      - "8089:8089"
-    environment:
-      - REDIS_HOST=redis \
-      - API_PORT=8089
-    depends_on:
-      - redis
-```
-
-## 📊 Monitoring
-
-### Health Check
-```bash
-curl http://localhost:8089/api/v1/health
-```
-
-### Metrics
-```bash
-curl http://localhost:8089/api/v1/metrics
-```
-
-### Statistics
-```bash
-curl http://localhost:8089/api/v1/stats
-```
-
-## 🔍 Examples
-
-### Python Client
-```python
-import asyncio
-from api_client_example import CrawlerAPIClient
-
-async def main():
-    async with CrawlerAPIClient() as client:
-        # Start crawler
-        await client.start_crawler({
-            'workers': 3,
-            'max_pages': 100
-        })
-        
-        # Add URLs
-        await client.add_urls(['https://example.com'], priority=1.0)
-        
-        # Monitor progress
-        while True:
-            status = await client.get_crawler_status()
-            if not status['crawler_running']:
-                break
-            await asyncio.sleep(5)
-
-asyncio.run(main())
-```
-
-### JavaScript Client
-```javascript
-const API_BASE = 'http://localhost:8089/api/v1';
-
-// Start crawler
-await fetch(`${API_BASE}/crawler/start`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-        config: { workers: 2, max_pages: 50 }
-    })
-});
-
-// Add URLs
-await fetch(`${API_BASE}/urls/add`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-        urls: ['https://example.com'],
-        priority: 1.0
-    })
-});
-```
-
-## 🧪 Testing
-
-### Run Basic Tests
-```bash
-python test_basic.py
-```
-
-### API Testing
-```bash
-# Test health endpoint
-curl http://localhost:8089/api/v1/health
-
-# Test configuration
-curl http://localhost:8089/api/v1/config
-```
-
-## 📝 Logging
-
-Logs are written to both console and file:
-- Console: Real-time logging
-- File: `api_crawler.log` (rotated automatically)
-
-Log levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
+### Docker Configuration
+- [docker-compose.yml](config/docker-compose.yml) - Service orchestration
+- [Dockerfile](backend/Dockerfile) - Backend container
+- [Frontend Dockerfile](frontend/Dockerfile) - Frontend container
 
 ## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Add tests
+4. Add tests if applicable
 5. Submit a pull request
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](docs/LICENSE) file for details.
 
 ## 🆘 Support
 
-- **Issues**: [GitHub Issues](https://github.com/prashanth8983/donut-bot/issues)
-- **Documentation**: This README and inline code comments
-- **Examples**: See `api_client_example.py` for comprehensive usage examples
-
-## 🔄 Migration from Old Version
-
-If you're migrating from the old `web_crawler.py`:
-
-1. **Old way**: Direct instantiation and method calls
-2. **New way**: API-driven control via REST endpoints
-
-The old `web_crawler.py` is still available for backward compatibility, but the new API-driven approach is recommended for all new development.
+For issues and questions:
+1. Check the [documentation](docs/README.md)
+2. Search existing issues
+3. Create a new issue with detailed information
 
 ---
 
-**Happy Crawling! 🕷️**
+**Happy Crawling! 🕷️** 
