@@ -43,7 +43,7 @@ async def create_job(
 
 @router.get("/", response_model=JobListResponse)
 async def get_jobs(
-    status: Optional[str] = Query(None, description="Filter by job status"),
+    job_status: Optional[str] = Query(None, description="Filter by job status"),
     priority: Optional[str] = Query(None, description="Filter by priority"),
     domain: Optional[str] = Query(None, description="Filter by domain"),
     scheduled: Optional[bool] = Query(None, description="Filter by scheduled status"),
@@ -54,7 +54,7 @@ async def get_jobs(
     """Get jobs with optional filtering and pagination."""
     try:
         jobs = await job_service.get_jobs(
-            status=status,
+            status=job_status,
             priority=priority,
             domain=domain,
             scheduled=scheduled,

@@ -1,16 +1,224 @@
 """
-Pydantic schemas for data validation and serialization.
-Defines the structure of request and response models.
+Fixed Pydantic schemas for MongoDB integration with Pydantic v2 compatibility.
 """
 
 from datetime import datetime
-from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field, validator
+from typing import Optional, List, Dict, Any, Union
 from bson import ObjectId
+from pydantic import BaseModel, Field, ConfigDict, field_validator, field_serializer
+from pydantic.functional_validators import BeforeValidator
+from typing_extensions import Annotated
 
 
-class PyObjectId(ObjectId):
-    """Custom ObjectId field for Pydantic models."""
+def validate_object_id(v: Any) -> ObjectId:
+    """Validate and convert various inputs to ObjectId."""
+    if isinstance(v, ObjectId):
+        return v
+    if isinstance(v, str):
+        if ObjectId.is_valid(v):
+            return ObjectId(v)
+        raise ValueError(f"Invalid ObjectId: {v}")
+    raise ValueError(f"ObjectId expected, got {type(v)}")
+
+
+def serialize_object_id(v: ObjectId) -> str:
+    """Serialize ObjectId to string."""
+    return str(v)
+
+
+# Custom ObjectId type with proper validation and serialization
+PyObjectId = Annotated[
+    ObjectId,
+    BeforeValidator(validate_object_id),
+]
+
+
+class MongoBaseModel(BaseModel):
+    """Base model for MongoDB documents with proper configuration."""
+    
+    # Pydantic v2 configuration
+    model_config = ConfigDict(
+        # Renamed from allow_population_by_field_name
+        populate_by_name=True,
+        # Renamed from schema_extra  
+        json_schema_extra={
+            "example": {}
+        },
+        # Allow arbitrary types like ObjectId
+        arbitrary_types_allowed=True,
+        # Use enum values in serialization
+        use_enum_values=True,
+        # Validate assignment
+        validate_assignment=True,
+    )
+
+
+class JobBase(MongoBaseModel):
+    """Base job schema with common fields."""
+    name: str = Field(..., min_length=1, max_length=100, description="Job name")
+    domain: str = Field(..., description="Domain to crawl")
+    priority: str = Field(default="medium", description="Job priority")
+    scheduled: bool = Field(default=False, description="Is job scheduled")
+    
+    # Optional fields with defaults
+    max_pages: Optional[int] = Field(default=1000, ge=1, description="Maximum pages to crawl")
+    max_depth: Optional[int] = Field(default=3, ge=1, description="Maximum crawl depth")
+    description: Optional[str] = Field(default="", max_length=500, description="Job description")
+    tags: Optional[List[str]] = Field(default_factory=list, description="Job tags")
+    
+    @field_validator('priority')
+    @classmethod
+    def validate_priority(cls, v):
+        valid_priorities = ['low', 'medium', 'high', 'urgent']
+        if v not in valid_priorities:
+            raise ValueError(f'Priority must be one of: {valid_priorities}')
+        return v
+    
+    @field_validator('tags')
+    @classmethod
+    def validate_tags(cls, v):
+        if v and len(v) > 10:
+            raise ValueError('Maximum 10 tags allowed')
+        return v
+
+
+class JobCreate(JobBase):
+    """Schema for creating a new job."""
+    pass
+
+
+class JobUpdate(MongoBaseModel):
+    """Schema for updating an existing job."""
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    domain: Optional[str] = Field(None)
+    priority: Optional[str] = Field(None)
+    scheduled: Optional[bool] = Field(None)
+    max_pages: Optional[int] = Field(None, ge=1)
+    max_depth: Optional[int] = Field(None, ge=1)
+    description: Optional[str] = Field(None, max_length=500)
+    tags: Optional[List[str]] = Field(None)
+    
+    # Runtime fields that can be updated
+    status: Optional[str] = Field(None)
+    progress: Optional[float] = Field(None, ge=0.0, le=100.0)
+    pages_found: Optional[int] = Field(None, ge=0)
+    errors: Optional[int] = Field(None, ge=0)
+    data_size: Optional[str] = Field(None)
+    avg_response_time: Optional[str] = Field(None)
+    success_rate: Optional[float] = Field(None, ge=0.0, le=100.0)
+    
+    @field_validator('priority')
+    @classmethod
+    def validate_priority(cls, v):
+        if v is not None:
+            valid_priorities = ['low', 'medium', 'high', 'urgent']
+            if v not in valid_priorities:
+                raise ValueError(f'Priority must be one of: {valid_priorities}')
+        return v
+    
+    @field_validator('status')
+    @classmethod
+    def validate_status(cls, v):
+        if v is not None:
+            valid_statuses = ['queued', 'running', 'paused', 'completed', 'failed', 'cancelled']
+            if v not in valid_statuses:
+                raise ValueError(f'Status must be one of: {valid_statuses}')
+        return v
+
+
+class JobResponse(JobBase):
+    """Schema for job responses."""
+    # Use string for id field to avoid serialization issues
+    id: str = Field(alias="_id", description="Job ID")
+    
+    # Runtime fields
+    status: str = Field(default="queued", description="Job status")
+    progress: float = Field(default=0.0, ge=0.0, le=100.0, description="Job progress percentage")
+    pages_found: int = Field(default=0, ge=0, description="Number of pages found")
+    errors: int = Field(default=0, ge=0, description="Number of errors")
+    data_size: str = Field(default="0 MB", description="Amount of data crawled")
+    avg_response_time: str = Field(default="0s", description="Average response time")
+    success_rate: float = Field(default=0.0, ge=0.0, le=100.0, description="Success rate percentage")
+    
+    # Timestamps
+    created_at: datetime = Field(description="Creation timestamp")
+    updated_at: datetime = Field(description="Last update timestamp")
+    start_time: Optional[datetime] = Field(default=None, description="Job start time")
+    end_time: Optional[datetime] = Field(default=None, description="Job end time")
+    
+    @field_validator('status')
+    @classmethod
+    def validate_status(cls, v):
+        valid_statuses = ['queued', 'running', 'paused', 'completed', 'failed', 'cancelled']
+        if v not in valid_statuses:
+            raise ValueError(f'Status must be one of: {valid_statuses}')
+        return v
+    
+    @field_serializer('id', when_used='json')
+    def serialize_id(self, v):
+        if isinstance(v, ObjectId):
+            return str(v)
+        return v
+
+
+class JobListResponse(MongoBaseModel):
+    """Schema for paginated job list responses."""
+    jobs: List[JobResponse] = Field(description="List of jobs")
+    count: int = Field(ge=0, description="Number of jobs in current page")
+    total: int = Field(ge=0, description="Total number of jobs")
+    page: int = Field(ge=1, description="Current page number")
+    size: int = Field(ge=1, description="Page size")
+    
+    @property
+    def total_pages(self) -> int:
+        """Calculate total number of pages."""
+        if self.size <= 0:
+            return 0
+        return (self.total + self.size - 1) // self.size
+    
+    @property
+    def has_next(self) -> bool:
+        """Check if there are more pages."""
+        return self.page < self.total_pages
+    
+    @property
+    def has_previous(self) -> bool:
+        """Check if there are previous pages."""
+        return self.page > 1
+
+
+class JobStatsItem(MongoBaseModel):
+    """Schema for individual job status statistics."""
+    count: int = Field(ge=0, description="Number of jobs")
+    total_pages: int = Field(ge=0, description="Total pages found")
+    total_errors: int = Field(ge=0, description="Total errors")
+
+
+class JobStats(MongoBaseModel):
+    """Schema for job statistics."""
+    queued: JobStatsItem = Field(default_factory=lambda: JobStatsItem(count=0, total_pages=0, total_errors=0))
+    running: JobStatsItem = Field(default_factory=lambda: JobStatsItem(count=0, total_pages=0, total_errors=0))
+    paused: JobStatsItem = Field(default_factory=lambda: JobStatsItem(count=0, total_pages=0, total_errors=0))
+    completed: JobStatsItem = Field(default_factory=lambda: JobStatsItem(count=0, total_pages=0, total_errors=0))
+    failed: JobStatsItem = Field(default_factory=lambda: JobStatsItem(count=0, total_pages=0, total_errors=0))
+    cancelled: JobStatsItem = Field(default_factory=lambda: JobStatsItem(count=0, total_pages=0, total_errors=0))
+    
+    @property
+    def total_jobs(self) -> int:
+        """Calculate total number of jobs across all statuses."""
+        return (self.queued.count + self.running.count + self.paused.count + 
+                self.completed.count + self.failed.count + self.cancelled.count)
+    
+    @property
+    def total_pages_crawled(self) -> int:
+        """Calculate total pages crawled across all jobs."""
+        return (self.queued.total_pages + self.running.total_pages + self.paused.total_pages + 
+                self.completed.total_pages + self.failed.total_pages + self.cancelled.total_pages)
+
+
+# Legacy PyObjectId class for backward compatibility
+class LegacyPyObjectId(ObjectId):
+    """Legacy PyObjectId for backward compatibility."""
     
     @classmethod
     def __get_validators__(cls):
@@ -27,262 +235,146 @@ class PyObjectId(ObjectId):
         field_schema.update(type="string")
 
 
-class JobConfig(BaseModel):
-    """Configuration for a crawl job."""
-    
-    workers: int = Field(default=2, ge=1, le=10)
-    max_depth: int = Field(default=3, ge=1, le=10)
-    max_pages: int = Field(default=1000, ge=1, le=100000)
-    allowed_domains: List[str] = Field(default_factory=list)
-    delay: float = Field(default=1.0, ge=0.1, le=10.0)
-    timeout: int = Field(default=30, ge=5, le=300)
-    user_agent: str = Field(default="WebCrawler/1.0")
-    
-    class Config:
-        schema_extra = {
-            "example": {
-                "workers": 2,
-                "max_depth": 3,
-                "max_pages": 1000,
-                "allowed_domains": ["example.com"],
-                "delay": 1.0,
-                "timeout": 30,
-                "user_agent": "WebCrawler/1.0"
-            }
-        }
+# Error response schemas
+class ErrorDetail(MongoBaseModel):
+    """Schema for error details."""
+    message: str = Field(description="Error message")
+    code: Optional[str] = Field(default=None, description="Error code")
+    field: Optional[str] = Field(default=None, description="Field that caused the error")
 
 
-class JobBase(BaseModel):
-    """Base job model with common fields."""
+class ErrorResponse(MongoBaseModel):
+    """Schema for error responses."""
+    error: str = Field(description="Error type")
+    detail: Union[str, List[ErrorDetail]] = Field(description="Error details")
+    timestamp: datetime = Field(description="Error timestamp")
     
-    name: str = Field(..., min_length=1, max_length=200)
-    domain: str = Field(..., min_length=1, max_length=500)
-    depth: int = Field(default=3, ge=1, le=10)
-    priority: str = Field(default="medium", regex="^(high|medium|low)$")
-    category: str = Field(default="General", max_length=100)
-    config: JobConfig = Field(default_factory=JobConfig)
-    urls: List[str] = Field(default_factory=list)
     
-    @validator('domain')
-    def validate_domain(cls, v):
-        if not v.startswith(('http://', 'https://')):
-            raise ValueError('Domain must be a valid URL')
+# Health check schemas
+class HealthStatus(MongoBaseModel):
+    """Schema for health check responses."""
+    status: str = Field(description="Service status")
+    service: str = Field(description="Service name")
+    timestamp: str = Field(description="Check timestamp")
+
+
+class DetailedHealthStatus(HealthStatus):
+    """Schema for detailed health check responses."""
+    database: str = Field(description="Database status")
+    response_time_ms: float = Field(description="Response time in milliseconds")
+    checks: Dict[str, Any] = Field(description="Detailed check results")
+
+
+# Export commonly used schemas
+__all__ = [
+    'PyObjectId',
+    'MongoBaseModel',
+    'JobBase',
+    'JobCreate', 
+    'JobUpdate',
+    'JobResponse',
+    'JobListResponse',
+    'JobStats',
+    'JobStatsItem',
+    'ErrorDetail',
+    'ErrorResponse',
+    'HealthStatus',
+    'DetailedHealthStatus',
+    'LegacyPyObjectId'
+]
+
+# Scheduled Job Schemas
+class ScheduledJobBase(MongoBaseModel):
+    """Base scheduled job model with common fields."""
+    name: str = Field(..., min_length=1, max_length=100, description="Scheduled job name")
+    domain: str = Field(..., description="Domain to crawl")
+    schedule: str = Field(..., description="Cron expression for scheduling")
+    priority: str = Field(default="medium", description="Job priority")
+    max_pages: Optional[int] = Field(default=1000, ge=1, description="Maximum pages to crawl")
+    max_depth: Optional[int] = Field(default=3, ge=1, description="Maximum crawl depth")
+    description: Optional[str] = Field(default="", max_length=500, description="Job description")
+    tags: Optional[List[str]] = Field(default_factory=list, description="Job tags")
+    
+    @field_validator('priority')
+    @classmethod
+    def validate_priority(cls, v):
+        valid_priorities = ['low', 'medium', 'high', 'urgent']
+        if v not in valid_priorities:
+            raise ValueError(f'Priority must be one of: {valid_priorities}')
         return v
+
+
+class ScheduledJobCreate(ScheduledJobBase):
+    """Schema for creating a new scheduled job."""
+    pass
+
+
+class ScheduledJobUpdate(MongoBaseModel):
+    """Schema for updating a scheduled job."""
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    domain: Optional[str] = Field(None)
+    schedule: Optional[str] = Field(None, description="Cron expression for scheduling")
+    status: Optional[str] = Field(None, description="Job status")
+    priority: Optional[str] = Field(None)
+    max_pages: Optional[int] = Field(None, ge=1)
+    max_depth: Optional[int] = Field(None, ge=1)
+    description: Optional[str] = Field(None, max_length=500)
+    tags: Optional[List[str]] = Field(None)
     
-    @validator('urls', each_item=True)
-    def validate_urls(cls, v):
-        if not v.startswith(('http://', 'https://')):
-            raise ValueError('URLs must be valid URLs')
+    @field_validator('status')
+    @classmethod
+    def validate_status(cls, v):
+        if v is not None:
+            valid_statuses = ['enabled', 'disabled', 'running', 'failed']
+            if v not in valid_statuses:
+                raise ValueError(f'Status must be one of: {valid_statuses}')
         return v
 
 
-class JobCreate(JobBase):
-    """Schema for creating a new job."""
-    
-    scheduled: bool = Field(default=False)
-    
-    class Config:
-        schema_extra = {
-            "example": {
-                "name": "Test Crawl Job",
-                "domain": "https://example.com",
-                "depth": 2,
-                "priority": "medium",
-                "category": "Testing",
-                "config": {
-                    "workers": 2,
-                    "max_depth": 2,
-                    "max_pages": 100,
-                    "allowed_domains": ["example.com"],
-                    "delay": 1.0,
-                    "timeout": 30,
-                    "user_agent": "WebCrawler/1.0"
-                },
-                "urls": ["https://example.com"],
-                "scheduled": False
-            }
-        }
+class ScheduledJobResponse(ScheduledJobBase):
+    """Schema for scheduled job response."""
+    id: str = Field(alias="_id", description="Scheduled job ID")
+    status: str = Field(default="enabled", description="Job status")
+    next_run: datetime = Field(description="Next scheduled run time")
+    last_run: Optional[datetime] = Field(default=None, description="Last run time")
+    created_at: datetime = Field(description="Creation timestamp")
+    updated_at: datetime = Field(description="Last update timestamp")
 
 
-class JobUpdate(BaseModel):
-    """Schema for updating a job."""
-    
-    name: Optional[str] = Field(None, min_length=1, max_length=200)
-    domain: Optional[str] = Field(None, min_length=1, max_length=500)
-    status: Optional[str] = Field(None, regex="^(queued|running|completed|paused|failed)$")
-    priority: Optional[str] = Field(None, regex="^(high|medium|low)$")
-    category: Optional[str] = Field(None, max_length=100)
-    config: Optional[JobConfig] = None
-    urls: Optional[List[str]] = None
-    
-    class Config:
-        schema_extra = {
-            "example": {
-                "name": "Updated Job Name",
-                "status": "running",
-                "priority": "high"
-            }
-        }
+class ScheduledJobListResponse(MongoBaseModel):
+    """Schema for scheduled job list response."""
+    scheduled_jobs: List[ScheduledJobResponse] = Field(description="List of scheduled jobs")
+    count: int = Field(ge=0, description="Number of jobs in current page")
+    total: int = Field(ge=0, description="Total number of jobs")
+    page: int = Field(ge=1, description="Current page number")
+    size: int = Field(ge=1, description="Page size")
 
 
-class JobResponse(JobBase):
-    """Schema for job response."""
-    
-    id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
-    status: str = Field(default="queued")
-    progress: float = Field(default=0.0, ge=0.0, le=100.0)
-    pages_found: int = Field(default=0, ge=0)
-    errors: int = Field(default=0, ge=0)
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
-    estimated_end: Optional[datetime] = None
-    scheduled: bool = Field(default=False)
-    data_size: str = Field(default="0 MB")
-    avg_response_time: str = Field(default="0s")
-    success_rate: float = Field(default=0.0, ge=0.0, le=100.0)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
-    
-    class Config:
-        allow_population_by_field_name = True
-        schema_extra = {
-            "example": {
-                "_id": "507f1f77bcf86cd799439011",
-                "name": "Test Crawl Job",
-                "domain": "https://example.com",
-                "status": "queued",
-                "progress": 0.0,
-                "pages_found": 0,
-                "errors": 0,
-                "depth": 2,
-                "priority": "medium",
-                "category": "Testing",
-                "scheduled": False,
-                "data_size": "0 MB",
-                "avg_response_time": "0s",
-                "success_rate": 0.0,
-                "config": {
-                    "workers": 2,
-                    "max_depth": 2,
-                    "max_pages": 100,
-                    "allowed_domains": ["example.com"],
-                    "delay": 1.0,
-                    "timeout": 30,
-                    "user_agent": "WebCrawler/1.0"
-                },
-                "urls": ["https://example.com"],
-                "created_at": "2025-06-22T16:58:47.347000",
-                "updated_at": "2025-06-22T16:58:47.347000"
-            }
-        }
+# Update __all__ to include scheduled job schemas
+__all__ = [
+    'PyObjectId',
+    'MongoBaseModel',
+    'JobBase',
+    'JobCreate', 
+    'JobUpdate',
+    'JobResponse',
+    'JobListResponse',
+    'JobStats',
+    'JobStatsItem',
+    'ErrorDetail',
+    'ErrorResponse',
+    'HealthStatus',
+    'DetailedHealthStatus',
+    'LegacyPyObjectId',
+    'ScheduledJobBase',
+    'ScheduledJobCreate',
+    'ScheduledJobUpdate',
+    'ScheduledJobResponse',
+    'ScheduledJobListResponse'
+] 
 
-
-class JobListResponse(BaseModel):
-    """Schema for job list response."""
-    
-    jobs: List[JobResponse]
-    count: int
-    total: int
-    page: int = Field(default=1, ge=1)
-    size: int = Field(default=100, ge=1, le=1000)
-    
-    class Config:
-        schema_extra = {
-            "example": {
-                "jobs": [],
-                "count": 0,
-                "total": 0,
-                "page": 1,
-                "size": 100
-            }
-        }
-
-
-class CrawlerStatus(BaseModel):
-    """Schema for crawler status response."""
-    
-    crawler_running: bool
-    uptime_seconds: float
-    pages_crawled_total: int
-    max_pages_configured: int
-    pages_remaining_in_limit: int
-    avg_pages_per_second: float
-    frontier_queue_size: int
-    urls_in_processing: int
-    urls_completed_redis: int
-    urls_seen_redis: int
-    bloom_filter_items: int
-    robots_denied_count: int
-    total_errors_count: int
-    active_workers_configured: int
-    current_time_utc: str
-    allowed_domains: List[str]
-    
-    class Config:
-        schema_extra = {
-            "example": {
-                "crawler_running": True,
-                "uptime_seconds": 120.5,
-                "pages_crawled_total": 50,
-                "max_pages_configured": 4000,
-                "pages_remaining_in_limit": 3950,
-                "avg_pages_per_second": 0.4,
-                "frontier_queue_size": 100,
-                "urls_in_processing": 5,
-                "urls_completed_redis": 45,
-                "urls_seen_redis": 150,
-                "bloom_filter_items": 150,
-                "robots_denied_count": 2,
-                "total_errors_count": 1,
-                "active_workers_configured": 3,
-                "current_time_utc": "2025-06-22T17:20:00.000000",
-                "allowed_domains": ["example.com", "test.com"]
-            }
-        }
-
-
-class JobStats(BaseModel):
-    """Schema for job statistics response."""
-    
-    queued: dict = Field(default_factory=dict)
-    running: dict = Field(default_factory=dict)
-    completed: dict = Field(default_factory=dict)
-    failed: dict = Field(default_factory=dict)
-    paused: dict = Field(default_factory=dict)
-    
-    class Config:
-        schema_extra = {
-            "example": {
-                "queued": {"count": 5, "total_pages": 0, "total_errors": 0},
-                "running": {"count": 2, "total_pages": 150, "total_errors": 3},
-                "completed": {"count": 10, "total_pages": 5000, "total_errors": 25},
-                "failed": {"count": 1, "total_pages": 50, "total_errors": 10},
-                "paused": {"count": 0, "total_pages": 0, "total_errors": 0}
-            }
-        }
-
-
-class JobModel(BaseModel):
-    """Job model for database operations."""
-    
-    id: Optional[PyObjectId] = Field(default_factory=PyObjectId, alias="_id")
-    name: str
-    status: str = "pending"
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
-    config: Optional[Dict[str, Any]] = None
-    results: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
-    
-    class Config:
-        allow_population_by_field_name = True
-        arbitrary_types_allowed = True
-        json_encoders = {ObjectId: str}
-
-
-class CrawlerConfigModel(BaseModel):
+class CrawlerConfigModel(MongoBaseModel):
     """Crawler configuration model for API operations."""
-    
     workers: int = Field(default=4, ge=1, le=20)
     max_depth: int = Field(default=3, ge=0, le=10)
     max_pages: int = Field(default=1000, ge=1, le=100000)
@@ -296,57 +388,44 @@ class CrawlerConfigModel(BaseModel):
     redis_host: str = "localhost"
     redis_port: int = 6379
     respect_robots_txt: bool = True
-    user_agent: str = "DonutBot/1.0"
-    
-    class Config:
-        schema_extra = {
-            "example": {
-                "workers": 4,
-                "max_depth": 3,
-                "max_pages": 1000,
-                "default_delay": 1.0,
-                "allowed_domains": ["example.com", "test.com"],
-                "kafka_brokers": ["localhost:9092"],
-                "output_topic": "crawler_output",
-                "enable_kafka_output": False,
-                "enable_local_save": True,
-                "local_output_dir": "output",
-                "redis_host": "localhost",
-                "redis_port": 6379,
-                "respect_robots_txt": True,
-                "user_agent": "DonutBot/1.0"
-            }
-        }
+    user_agent: str = "DonutBot/1.0" 
 
-
-class JobCreateRequest(BaseModel):
-    """Request model for creating a new job."""
-    
+class NextRun(MongoBaseModel):
+    """Schema for next run information."""
+    id: str = Field(alias="_id")
     name: str
-    config: Optional[CrawlerConfigModel] = None
+    domain: str
+    next_run: datetime
+    schedule: str
+    priority: str
 
+class NextRunsResponse(MongoBaseModel):
+    """Schema for next runs response."""
+    next_runs: List[NextRun]
+    count: int
 
-class JobUpdateRequest(BaseModel):
-    """Request model for updating a job."""
-    
-    name: Optional[str] = None
-    status: Optional[str] = None
-    config: Optional[CrawlerConfigModel] = None
-    results: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
-
-
-class JobResponse(BaseModel):
-    """Response model for job operations."""
-    
-    id: str
-    name: str
-    status: str
-    created_at: datetime
-    updated_at: datetime
-    config: Optional[Dict[str, Any]] = None
-    results: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
-    
-    class Config:
-        json_encoders = {datetime: lambda v: v.isoformat()} 
+# Update __all__ to include NextRun and NextRunsResponse
+__all__ = [
+    'PyObjectId',
+    'MongoBaseModel',
+    'JobBase',
+    'JobCreate', 
+    'JobUpdate',
+    'JobResponse',
+    'JobListResponse',
+    'JobStats',
+    'JobStatsItem',
+    'ErrorDetail',
+    'ErrorResponse',
+    'HealthStatus',
+    'DetailedHealthStatus',
+    'LegacyPyObjectId',
+    'ScheduledJobBase',
+    'ScheduledJobCreate',
+    'ScheduledJobUpdate',
+    'ScheduledJobResponse',
+    'ScheduledJobListResponse',
+    'CrawlerConfigModel',
+    'NextRun',
+    'NextRunsResponse'
+] 

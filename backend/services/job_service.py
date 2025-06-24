@@ -26,20 +26,39 @@ class JobService:
     async def create_job(self, job_data: JobCreate) -> JobResponse:
         """Create a new crawl job."""
         try:
-            # Convert Pydantic model to dict
-            job_dict = job_data.dict()
-            job_dict["created_at"] = datetime.now(timezone.utc)
-            job_dict["updated_at"] = datetime.now(timezone.utc)
-            job_dict["status"] = "queued"
-            job_dict["progress"] = 0.0
-            job_dict["pages_found"] = 0
-            job_dict["errors"] = 0
-            job_dict["data_size"] = "0 MB"
-            job_dict["avg_response_time"] = "0s"
-            job_dict["success_rate"] = 0.0
+            # Check for duplicate job names if name is provided
+            if hasattr(job_data, 'name') and job_data.name:
+                existing = await self.collection.find_one({"name": job_data.name})
+                if existing:
+                    raise JobAlreadyExistsError(f"Job with name '{job_data.name}' already exists")
+            
+            # Convert Pydantic model to dict - use model_dump() for Pydantic v2
+            if hasattr(job_data, 'model_dump'):
+                job_dict = job_data.model_dump()
+            else:
+                job_dict = job_data.dict()  # Fallback for Pydantic v1
+            
+            # Set default values
+            now = datetime.now(timezone.utc)
+            job_dict.update({
+                "created_at": now,
+                "updated_at": now,
+                "status": "queued",
+                "progress": 0.0,
+                "pages_found": 0,
+                "errors": 0,
+                "data_size": "0 MB",
+                "avg_response_time": "0s",
+                "success_rate": 0.0,
+                "start_time": None,
+                "end_time": None
+            })
             
             # Insert into database
             result = await self.collection.insert_one(job_dict)
+            
+            if not result.inserted_id:
+                raise DatabaseError("Failed to insert job - no ID returned")
             
             # Get the created job
             created_job = await self.get_job_by_id(str(result.inserted_id))
@@ -49,20 +68,41 @@ class JobService:
             logger.info(f"Created job: {created_job.name} (ID: {created_job.id})")
             return created_job
             
+        except (JobAlreadyExistsError, DatabaseError):
+            raise
         except Exception as e:
             logger.error(f"Failed to create job: {e}")
-            raise DatabaseError(f"Job creation failed: {e}")
+            raise DatabaseError(f"Job creation failed: {str(e)}")
     
     async def get_job_by_id(self, job_id: str) -> Optional[JobResponse]:
         """Get a job by ID."""
         try:
-            if not ObjectId.is_valid(job_id):
+            if not job_id or not ObjectId.is_valid(job_id):
+                logger.warning(f"Invalid job ID format: {job_id}")
                 return None
             
             doc = await self.collection.find_one({"_id": ObjectId(job_id)})
             if doc:
-                # Convert MongoDB document to JobResponse
+                # Keep _id for PyObjectId alias, but ensure it's a string
                 doc["_id"] = str(doc["_id"])
+                # Ensure all required fields are present with defaults
+                doc.setdefault("name", "Unknown Job")
+                doc.setdefault("domain", "https://example.com")
+                doc.setdefault("depth", 3)
+                doc.setdefault("priority", "medium")
+                doc.setdefault("category", "General")
+                doc.setdefault("config", {})
+                doc.setdefault("urls", [])
+                doc.setdefault("status", "queued")
+                doc.setdefault("progress", 0.0)
+                doc.setdefault("pages_found", 0)
+                doc.setdefault("errors", 0)
+                doc.setdefault("scheduled", False)
+                doc.setdefault("data_size", "0 MB")
+                doc.setdefault("avg_response_time", "0s")
+                doc.setdefault("success_rate", 0.0)
+                doc.setdefault("created_at", datetime.now(timezone.utc))
+                doc.setdefault("updated_at", datetime.now(timezone.utc))
                 return JobResponse(**doc)
             return None
             
@@ -81,6 +121,12 @@ class JobService:
     ) -> JobListResponse:
         """Get jobs with optional filtering and pagination."""
         try:
+            # Validate pagination parameters
+            if page < 1:
+                page = 1
+            if size < 1 or size > 1000:  # Limit max size
+                size = min(max(size, 1), 1000)
+            
             # Build filter query
             filter_query = {}
             if status:
@@ -98,15 +144,41 @@ class JobService:
             # Get total count
             total = await self.collection.count_documents(filter_query)
             
-            # Get jobs with pagination
-            cursor = self.collection.find(filter_query).skip(skip).limit(size)
+            # Get jobs with pagination, sorted by created_at desc
+            cursor = self.collection.find(filter_query).sort("created_at", -1).skip(skip).limit(size)
             jobs = []
             
             async for doc in cursor:
-                # Convert MongoDB document to JobResponse
-                doc["_id"] = str(doc["_id"])
-                job = JobResponse(**doc)
-                jobs.append(job)
+                try:
+                    # Convert _id to id field for PyObjectId alias
+                    if "_id" in doc and doc["_id"] is not None:
+                        # Keep _id for PyObjectId alias, but ensure it's a string
+                        doc["_id"] = str(doc["_id"])
+                        # Ensure all required fields are present with defaults
+                        doc.setdefault("name", "Unknown Job")
+                        doc.setdefault("domain", "https://example.com")
+                        doc.setdefault("depth", 3)
+                        doc.setdefault("priority", "medium")
+                        doc.setdefault("category", "General")
+                        doc.setdefault("config", {})
+                        doc.setdefault("urls", [])
+                        doc.setdefault("status", "queued")
+                        doc.setdefault("progress", 0.0)
+                        doc.setdefault("pages_found", 0)
+                        doc.setdefault("errors", 0)
+                        doc.setdefault("scheduled", False)
+                        doc.setdefault("data_size", "0 MB")
+                        doc.setdefault("avg_response_time", "0s")
+                        doc.setdefault("success_rate", 0.0)
+                        doc.setdefault("created_at", datetime.now(timezone.utc))
+                        doc.setdefault("updated_at", datetime.now(timezone.utc))
+                        job = JobResponse(**doc)
+                        jobs.append(job)
+                    else:
+                        logger.warning(f"Skipping job with null _id: {doc}")
+                except Exception as job_error:
+                    logger.error(f"Error processing job document: {job_error}")
+                    continue
             
             return JobListResponse(
                 jobs=jobs,
@@ -118,12 +190,12 @@ class JobService:
             
         except Exception as e:
             logger.error(f"Error getting jobs: {e}")
-            raise DatabaseError(f"Failed to get jobs: {e}")
+            raise DatabaseError(f"Failed to get jobs: {str(e)}")
     
     async def update_job(self, job_id: str, job_data: JobUpdate) -> Optional[JobResponse]:
         """Update a job."""
         try:
-            if not ObjectId.is_valid(job_id):
+            if not job_id or not ObjectId.is_valid(job_id):
                 raise JobNotFoundError(f"Invalid job ID: {job_id}")
             
             # Check if job exists
@@ -131,8 +203,16 @@ class JobService:
             if not existing_job:
                 raise JobNotFoundError(f"Job not found: {job_id}")
             
-            # Prepare update data
-            update_data = job_data.dict(exclude_unset=True)
+            # Prepare update data - use model_dump() for Pydantic v2
+            if hasattr(job_data, 'model_dump'):
+                update_data = job_data.model_dump(exclude_unset=True)
+            else:
+                update_data = job_data.dict(exclude_unset=True)  # Fallback for Pydantic v1
+            
+            if not update_data:
+                logger.info(f"No changes to update for job {job_id}")
+                return existing_job
+            
             update_data["updated_at"] = datetime.now(timezone.utc)
             
             # Update in database
@@ -142,29 +222,44 @@ class JobService:
             )
             
             if result.modified_count > 0:
+                logger.info(f"Updated job {job_id} with fields: {list(update_data.keys())}")
                 return await self.get_job_by_id(job_id)
+            
             return existing_job
             
-        except JobNotFoundError:
+        except (JobNotFoundError, DatabaseError):
             raise
         except Exception as e:
             logger.error(f"Failed to update job {job_id}: {e}")
-            raise DatabaseError(f"Job update failed: {e}")
+            raise DatabaseError(f"Job update failed: {str(e)}")
     
     async def delete_job(self, job_id: str) -> bool:
         """Delete a job."""
         try:
-            if not ObjectId.is_valid(job_id):
+            if not job_id or not ObjectId.is_valid(job_id):
+                logger.warning(f"Invalid job ID for deletion: {job_id}")
                 return False
+            
+            # Check if job exists before deletion
+            existing_job = await self.get_job_by_id(job_id)
+            if not existing_job:
+                logger.warning(f"Job not found for deletion: {job_id}")
+                return False
+            
+            # Prevent deletion of running jobs
+            if existing_job.status == "running":
+                raise InvalidJobStateError("Cannot delete a running job. Stop the job first.")
             
             result = await self.collection.delete_one({"_id": ObjectId(job_id)})
             success = result.deleted_count > 0
             
             if success:
-                logger.info(f"Deleted job: {job_id}")
+                logger.info(f"Deleted job: {existing_job.name} (ID: {job_id})")
             
             return success
             
+        except InvalidJobStateError:
+            raise
         except Exception as e:
             logger.error(f"Failed to delete job {job_id}: {e}")
             return False
@@ -176,15 +271,19 @@ class JobService:
             if not job:
                 raise JobNotFoundError(f"Job not found: {job_id}")
             
-            if job.status in ["running", "completed"]:
-                raise InvalidJobStateError(f"Job is already {job.status}")
+            # Check valid state transitions
+            if job.status == "running":
+                raise InvalidJobStateError(f"Job is already running")
+            elif job.status == "completed":
+                raise InvalidJobStateError(f"Cannot restart a completed job")
             
             # Update job status
+            now = datetime.now(timezone.utc)
             update_data = {
                 "status": "running",
-                "start_time": datetime.now(timezone.utc),
+                "start_time": now,
                 "progress": 0.0,
-                "updated_at": datetime.now(timezone.utc)
+                "updated_at": now
             }
             
             result = await self.collection.update_one(
@@ -196,26 +295,31 @@ class JobService:
                 logger.info(f"Started job: {job.name} (ID: {job_id})")
                 return True
             
+            logger.warning(f"Failed to update job status for {job_id}")
             return False
             
         except (JobNotFoundError, InvalidJobStateError):
             raise
         except Exception as e:
             logger.error(f"Failed to start job {job_id}: {e}")
-            return False
+            raise DatabaseError(f"Failed to start job: {str(e)}")
     
     async def stop_job(self, job_id: str) -> bool:
         """Stop a job."""
         try:
             job = await self.get_job_by_id(job_id)
-            if not job or job.status != "running":
-                raise InvalidJobStateError("Job is not running")
+            if not job:
+                raise JobNotFoundError(f"Job not found: {job_id}")
+            
+            if job.status != "running":
+                raise InvalidJobStateError(f"Job is not running (current status: {job.status})")
             
             # Update job status
+            now = datetime.now(timezone.utc)
             update_data = {
                 "status": "paused",
-                "end_time": datetime.now(timezone.utc),
-                "updated_at": datetime.now(timezone.utc)
+                "end_time": now,
+                "updated_at": now
             }
             
             result = await self.collection.update_one(
@@ -227,24 +331,28 @@ class JobService:
                 logger.info(f"Stopped job: {job.name} (ID: {job_id})")
                 return True
             
+            logger.warning(f"Failed to update job status for {job_id}")
             return False
             
-        except InvalidJobStateError:
+        except (JobNotFoundError, InvalidJobStateError):
             raise
         except Exception as e:
             logger.error(f"Failed to stop job {job_id}: {e}")
-            return False
+            raise DatabaseError(f"Failed to stop job: {str(e)}")
     
     async def get_job_stats(self) -> JobStats:
         """Get job statistics."""
         try:
             pipeline = [
                 {
+                    "$match": {"_id": {"$ne": None}}  # Exclude malformed documents
+                },
+                {
                     "$group": {
                         "_id": "$status",
                         "count": {"$sum": 1},
-                        "total_pages": {"$sum": "$pages_found"},
-                        "total_errors": {"$sum": "$errors"}
+                        "total_pages": {"$sum": {"$ifNull": ["$pages_found", 0]}},
+                        "total_errors": {"$sum": {"$ifNull": ["$errors", 0]}}
                     }
                 }
             ]
@@ -252,12 +360,17 @@ class JobService:
             stats = JobStats()
             async for doc in self.collection.aggregate(pipeline):
                 status = doc["_id"]
+                status_data = {
+                    "count": doc["count"],
+                    "total_pages": doc["total_pages"],
+                    "total_errors": doc["total_errors"]
+                }
+                
+                # Dynamically set attributes based on status
                 if hasattr(stats, status):
-                    setattr(stats, status, {
-                        "count": doc["count"],
-                        "total_pages": doc["total_pages"],
-                        "total_errors": doc["total_errors"]
-                    })
+                    setattr(stats, status, status_data)
+                else:
+                    logger.warning(f"Unknown job status in stats: {status}")
             
             return stats
             
@@ -268,10 +381,85 @@ class JobService:
     async def cleanup_malformed_jobs(self) -> int:
         """Remove jobs with null _id values (malformed documents)."""
         try:
-            result = await self.collection.delete_many({"_id": None})
+            # Also clean up documents with other malformed fields
+            malformed_filter = {
+                "$or": [
+                    {"_id": None},
+                    {"_id": {"$exists": False}},
+                    {"status": {"$exists": False}},
+                    {"created_at": {"$exists": False}}
+                ]
+            }
+            
+            result = await self.collection.delete_many(malformed_filter)
             if result.deleted_count > 0:
                 logger.info(f"Cleaned up {result.deleted_count} malformed job documents")
             return result.deleted_count
         except Exception as e:
             logger.error(f"Failed to cleanup malformed jobs: {e}")
-            return 0 
+            return 0
+    
+    async def complete_job(self, job_id: str, final_stats: Optional[Dict[str, Any]] = None) -> bool:
+        """Mark a job as completed with optional final statistics."""
+        try:
+            job = await self.get_job_by_id(job_id)
+            if not job:
+                raise JobNotFoundError(f"Job not found: {job_id}")
+            
+            if job.status == "completed":
+                logger.info(f"Job {job_id} is already completed")
+                return True
+            
+            now = datetime.now(timezone.utc)
+            update_data = {
+                "status": "completed",
+                "end_time": now,
+                "updated_at": now,
+                "progress": 100.0
+            }
+            
+            # Add final statistics if provided
+            if final_stats:
+                update_data.update(final_stats)
+            
+            result = await self.collection.update_one(
+                {"_id": ObjectId(job_id)},
+                {"$set": update_data}
+            )
+            
+            if result.modified_count > 0:
+                logger.info(f"Completed job: {job.name} (ID: {job_id})")
+                return True
+            
+            return False
+            
+        except (JobNotFoundError, DatabaseError):
+            raise
+        except Exception as e:
+            logger.error(f"Failed to complete job {job_id}: {e}")
+            raise DatabaseError(f"Failed to complete job: {str(e)}")
+    
+    async def update_job_progress(self, job_id: str, progress: float, stats: Optional[Dict[str, Any]] = None) -> bool:
+        """Update job progress and optional statistics."""
+        try:
+            if not 0 <= progress <= 100:
+                raise ValueError("Progress must be between 0 and 100")
+            
+            update_data = {
+                "progress": progress,
+                "updated_at": datetime.now(timezone.utc)
+            }
+            
+            if stats:
+                update_data.update(stats)
+            
+            result = await self.collection.update_one(
+                {"_id": ObjectId(job_id)},
+                {"$set": update_data}
+            )
+            
+            return result.modified_count > 0
+            
+        except Exception as e:
+            logger.error(f"Failed to update job progress {job_id}: {e}")
+            return False
