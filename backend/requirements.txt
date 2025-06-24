@@ -30,6 +30,9 @@ aiokafka==0.9.0
 # Bloom filter
 pybloom-live==3.0.0
 
+# Scheduler
+croniter==2.0.1
+
 # Logging
 structlog==23.2.0
 

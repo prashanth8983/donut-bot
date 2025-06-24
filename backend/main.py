@@ -12,8 +12,11 @@ import uvicorn
 
 from .config import settings
 from .core.logger import get_logger
-from .db.database import database, init_db
+from .db.database import database
 from .services.crawler_service import crawler_service
+from .services.scheduler_service import get_scheduler_service, close_scheduler_service
+from .services.kafka_service import close_kafka_service
+from .services.file_storage_service import close_file_storage_service
 from .core.crawler.config import CrawlerConfig
 from .api.v1.router import api_router
 
@@ -27,25 +30,41 @@ async def lifespan(app: FastAPI):
     logger.info("Starting donut-bot backend...")
     
     try:
-        # Initialize database
-        await init_db()
-        logger.info("Database initialized")
+        # Initialize database (optional for local development)
+        try:
+            await database.connect()
+            logger.info("Database initialized")
+        except Exception as e:
+            logger.warning(f"Database connection failed (continuing without DB): {e}")
         
-        # Initialize crawler service
-        crawler_config = CrawlerConfig(
-            redis_host=settings.redis_host,
-            redis_port=settings.redis_port,
-            redis_db=settings.redis_db,
-            workers=settings.default_workers,
-            max_depth=settings.default_max_depth,
-            max_pages=settings.default_max_pages,
-            default_delay=settings.default_delay,
-            allowed_domains=settings.default_allowed_domains,
-            kafka_brokers=settings.kafka_brokers,
-            output_topic=settings.kafka_topic
-        )
-        await crawler_service.initialize(crawler_config)
-        logger.info("Crawler service initialized successfully")
+        # Initialize crawler service (optional for local development)
+        try:
+            crawler_config = CrawlerConfig(
+                redis_host=settings.redis_host,
+                redis_port=settings.redis_port,
+                redis_db=settings.redis_db,
+                workers=settings.default_workers,
+                max_depth=settings.default_max_depth,
+                max_pages=settings.default_max_pages,
+                default_delay=settings.default_delay,
+                allowed_domains=settings.default_allowed_domains,
+                kafka_brokers=settings.kafka_brokers,
+                output_topic=settings.kafka_topic,
+                enable_kafka_output=settings.enable_kafka_output,
+                enable_local_save=settings.enable_local_save,
+                local_output_dir=settings.local_output_dir
+            )
+            await crawler_service.initialize(crawler_config)
+            logger.info("Crawler service initialized successfully")
+        except Exception as e:
+            logger.warning(f"Crawler service initialization failed (continuing without crawler): {e}")
+        
+        # Initialize scheduler service
+        try:
+            await get_scheduler_service()
+            logger.info("Scheduler service initialized successfully")
+        except Exception as e:
+            logger.warning(f"Scheduler service initialization failed (continuing without scheduler): {e}")
         
         logger.info("Backend startup completed successfully")
         
@@ -64,9 +83,40 @@ async def lifespan(app: FastAPI):
             await crawler_service.stop_crawler()
             logger.info("Crawler stopped")
         
+        # Close crawler service
+        try:
+            await crawler_service.close()
+            logger.info("Crawler service closed")
+        except Exception as e:
+            logger.warning(f"Error closing crawler service: {e}")
+        
+        # Close scheduler service
+        try:
+            await close_scheduler_service()
+            logger.info("Scheduler service closed")
+        except Exception as e:
+            logger.warning(f"Error closing scheduler service: {e}")
+        
+        # Close Kafka service
+        try:
+            await close_kafka_service()
+            logger.info("Kafka service closed")
+        except Exception as e:
+            logger.warning(f"Error closing Kafka service: {e}")
+        
+        # Close file storage service
+        try:
+            await close_file_storage_service()
+            logger.info("File storage service closed")
+        except Exception as e:
+            logger.warning(f"Error closing file storage service: {e}")
+        
         # Disconnect from database
-        await database.disconnect()
-        logger.info("Database disconnected")
+        try:
+            await database.disconnect()
+            logger.info("Database disconnected")
+        except Exception as e:
+            logger.warning(f"Error disconnecting from database: {e}")
         
         logger.info("Backend shutdown completed successfully")
         
@@ -103,12 +153,31 @@ async def startup_event():
     logger.info("Starting Donut Bot API...")
     
     # Initialize database
-    await init_db()
+    await database.connect()
     logger.info("Database initialized")
     
     # Initialize crawler service
-    await crawler_service.initialize()
+    crawler_config = CrawlerConfig(
+        redis_host=settings.redis_host,
+        redis_port=settings.redis_port,
+        redis_db=settings.redis_db,
+        workers=settings.default_workers,
+        max_depth=settings.default_max_depth,
+        max_pages=settings.default_max_pages,
+        default_delay=settings.default_delay,
+        allowed_domains=settings.default_allowed_domains,
+        kafka_brokers=settings.kafka_brokers,
+        output_topic=settings.kafka_topic,
+        enable_kafka_output=settings.enable_kafka_output,
+        enable_local_save=settings.enable_local_save,
+        local_output_dir=settings.local_output_dir
+    )
+    await crawler_service.initialize(crawler_config)
     logger.info("Crawler service initialized")
+    
+    # Initialize scheduler service
+    await get_scheduler_service()
+    logger.info("Scheduler service initialized")
 
 
 @app.on_event("shutdown")
@@ -120,6 +189,10 @@ async def shutdown_event():
     if crawler_service.crawler_engine and crawler_service.crawler_engine.running:
         await crawler_service.stop_crawler()
         logger.info("Crawler stopped")
+    
+    # Close scheduler service
+    await close_scheduler_service()
+    logger.info("Scheduler service closed")
     
     logger.info("Shutdown complete")
 
