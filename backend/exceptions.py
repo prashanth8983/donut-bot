@@ -55,6 +55,11 @@ class RateLimitError(DonutBotException):
     pass
 
 
+class RobotsError(DonutBotException):
+    """Exception raised when robots.txt operations fail."""
+    pass
+
+
 class RobotsTxtError(DonutBotException):
     """Exception raised when robots.txt parsing fails."""
     pass
@@ -72,4 +77,9 @@ class SerializationError(DonutBotException):
 
 class ServiceError(Exception):
     """Exception for service-related errors."""
+    pass
+
+
+class KafkaError(DonutBotException):
+    """Exception raised when Kafka operations fail."""
     pass 
