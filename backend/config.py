@@ -4,7 +4,8 @@ Uses Pydantic settings for type-safe configuration.
 """
 
 from typing import List, Optional
-from pydantic import BaseSettings, Field
+from pydantic import Field
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -13,50 +14,52 @@ class Settings(BaseSettings):
     # Application
     app_name: str = "Donut Bot API"
     app_version: str = "1.0.0"
-    debug: bool = Field(default=False, env="DEBUG")
+    debug: bool = Field(default=True)
     
     # Server
-    host: str = Field(default="0.0.0.0", env="HOST")
-    port: int = Field(default=8089, env="PORT")
+    host: str = Field(default="0.0.0.0")
+    port: int = Field(default=8089)
     
     # Database
     mongo_uri: str = Field(
-        default="mongodb://admin:password123@mongodb:27017/webcrawler?authSource=admin",
-        env="MONGO_URI"
+        default="mongodb://admin:password123@localhost:27017/webcrawler?authSource=admin"
     )
-    database_name: str = Field(default="webcrawler", env="DATABASE_NAME")
+    database_name: str = Field(default="webcrawler")
     
     # Redis
-    redis_host: str = Field(default="redis", env="REDIS_HOST")
-    redis_port: int = Field(default=6379, env="REDIS_PORT")
-    redis_db: int = Field(default=0, env="REDIS_DB")
+    redis_host: str = Field(default="localhost")
+    redis_port: int = Field(default=6379)
+    redis_db: int = Field(default=0)
     
     # Kafka
-    kafka_brokers: str = Field(default="kafka:9092", env="KAFKA_BROKERS")
-    kafka_topic: str = Field(default="raw-documents", env="KAFKA_TOPIC")
+    kafka_brokers: str = Field(default="localhost:9092")
+    kafka_topic: str = Field(default="raw-documents")
+    enable_kafka_output: bool = Field(default=False)
     
     # Crawler Configuration
-    default_workers: int = Field(default=3, env="DEFAULT_WORKERS")
-    default_max_depth: int = Field(default=3, env="DEFAULT_MAX_DEPTH")
-    default_max_pages: int = Field(default=4000, env="DEFAULT_MAX_PAGES")
-    default_delay: float = Field(default=2.0, env="DEFAULT_DELAY")
+    default_workers: int = Field(default=3)
+    default_max_depth: int = Field(default=3)
+    default_max_pages: int = Field(default=4000)
+    default_delay: float = Field(default=2.0)
     default_allowed_domains: List[str] = Field(
-        default=["northeastern.edu", "nyu.edu", "stanford.edu"],
-        env="DEFAULT_ALLOWED_DOMAINS"
+        default=["northeastern.edu", "nyu.edu", "stanford.edu"]
     )
     
     # Security
-    secret_key: str = Field(default="your-secret-key-here", env="SECRET_KEY")
-    access_token_expire_minutes: int = Field(default=30, env="ACCESS_TOKEN_EXPIRE_MINUTES")
+    secret_key: str = Field(default="your-secret-key-here")
+    access_token_expire_minutes: int = Field(default=30)
     
     # CORS
     cors_origins: List[str] = Field(
-        default=["http://localhost:3000", "http://localhost:8080"],
-        env="CORS_ORIGINS"
+        default=["http://localhost:3000", "http://localhost:8080"]
     )
     
     # Logging
-    log_level: str = Field(default="INFO", env="LOG_LEVEL")
+    log_level: str = Field(default="DEBUG")
+    
+    # File Storage
+    enable_local_save: bool = Field(default=True)
+    local_output_dir: str = Field(default="./crawler_output")
     
     class Config:
         env_file = ".env"

@@ -11,6 +11,8 @@ from ..core.crawler.engine import CrawlerEngine
 from ..core.crawler.config import CrawlerConfig
 from ..core.logger import get_logger
 from ..exceptions import CrawlError, ConfigurationError
+from .kafka_service import get_kafka_service
+from .file_storage_service import get_file_storage_service
 
 logger = get_logger("crawler_service")
 
@@ -22,6 +24,8 @@ class CrawlerService:
         self.crawler_engine: Optional[CrawlerEngine] = None
         self.config: Optional[CrawlerConfig] = None
         self.crawler_task: Optional[asyncio.Task] = None
+        self.kafka_service = None
+        self.file_storage_service = None
         
     async def initialize(self, config: CrawlerConfig):
         """Initialize the crawler service with configuration."""
@@ -30,6 +34,18 @@ class CrawlerService:
             self.config = config
             self.crawler_engine = CrawlerEngine(config)
             await self.crawler_engine.initialize()
+            
+            # Initialize Kafka service if configured
+            if config.enable_kafka_output and config.kafka_brokers and config.output_topic:
+                brokers_list = config.kafka_brokers.split(",")
+                self.kafka_service = await get_kafka_service(brokers_list, config.output_topic)
+                logger.info("Kafka service initialized for crawler")
+            
+            # Initialize file storage service if enabled
+            if config.enable_local_save:
+                self.file_storage_service = await get_file_storage_service(config.local_output_dir)
+                logger.info("File storage service initialized for crawler")
+            
             logger.info("Crawler service initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize crawler service: {e}")
@@ -206,6 +222,76 @@ class CrawlerService:
             logger.info("Crawler service closed successfully")
         except Exception as e:
             logger.error(f"Error closing crawler service: {e}")
+    
+    async def process_document(self, document: Dict[str, Any]) -> bool:
+        """
+        Process a crawled document through Kafka and/or file storage.
+        
+        Args:
+            document: The crawled document data
+            
+        Returns:
+            True if processed successfully, False otherwise
+        """
+        try:
+            # Add timestamp if not present
+            if "timestamp" not in document:
+                document["timestamp"] = datetime.now(timezone.utc).isoformat()
+            
+            success = True
+            
+            # Send to Kafka if enabled
+            if self.kafka_service:
+                kafka_success = await self.kafka_service.send_document(document)
+                if not kafka_success:
+                    logger.warning(f"Failed to send document to Kafka: {document.get('url', 'unknown')}")
+                    success = False
+            
+            # Save to file if enabled
+            if self.file_storage_service:
+                file_success = await self.file_storage_service.save_document(document)
+                if not file_success:
+                    logger.warning(f"Failed to save document to file: {document.get('url', 'unknown')}")
+                    success = False
+            
+            return success
+            
+        except Exception as e:
+            logger.error(f"Error processing document: {e}")
+            return False
+    
+    async def process_documents_batch(self, documents: List[Dict[str, Any]]) -> Dict[str, int]:
+        """
+        Process multiple documents in batch.
+        
+        Args:
+            documents: List of documents to process
+            
+        Returns:
+            Dictionary with processing results
+        """
+        results = {"kafka_success": 0, "kafka_failed": 0, "file_success": 0, "file_failed": 0}
+        
+        try:
+            # Process Kafka batch if enabled
+            if self.kafka_service:
+                kafka_results = await self.kafka_service.send_batch(documents)
+                results["kafka_success"] = kafka_results["success"]
+                results["kafka_failed"] = kafka_results["failed"]
+            
+            # Process file storage batch if enabled
+            if self.file_storage_service:
+                file_results = await self.file_storage_service.save_batch(documents)
+                results["file_success"] = file_results["success"]
+                results["file_failed"] = file_results["failed"]
+            
+            logger.info(f"Batch processing completed: Kafka={results['kafka_success']}/{results['kafka_failed']}, "
+                       f"File={results['file_success']}/{results['file_failed']}")
+            
+        except Exception as e:
+            logger.error(f"Error in batch processing: {e}")
+        
+        return results
 
 
 # Global crawler service instance
