@@ -73,4 +73,20 @@ async def clear_url_queue(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
+        )
+
+
+@router.get("/urls")
+async def get_urls(
+    url_service: URLService = Depends(get_url_service)
+):
+    """Get URLs from the crawler queue."""
+    try:
+        urls_data = await url_service.get_queue_status()
+        return urls_data
+    except Exception as e:
+        logger.error(f"Error getting URLs: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
         ) 

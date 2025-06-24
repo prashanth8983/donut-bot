@@ -83,6 +83,10 @@ class ConfigService:
         if not self.crawler_service.config:
             raise ConfigurationError("Configuration not initialized")
         
+        # Validate action first
+        if action not in ['add', 'remove', 'replace']:
+            raise ValueError("Invalid action. Must be 'add', 'remove', or 'replace'")
+        
         try:
             if self.crawler_service.config.allowed_domains is None:
                 self.crawler_service.config.allowed_domains = []
@@ -102,8 +106,6 @@ class ConfigService:
             elif action == 'replace':
                 current_domains = domains_to_process
                 message = f"Replaced allowed domains list with {len(current_domains)} domains"
-            else:
-                raise ValueError("Invalid action. Must be 'add', 'remove', or 'replace'")
             
             self.crawler_service.config.allowed_domains = sorted(list(current_domains))
             logger.info(f"Updated allowed domains: {action}. New list: {self.crawler_service.config.allowed_domains}")
@@ -113,8 +115,6 @@ class ConfigService:
                 'allowed_domains': self.crawler_service.config.allowed_domains,
                 'total_domains': len(self.crawler_service.config.allowed_domains)
             }
-        except ValueError as e:
-            raise e
         except Exception as e:
             logger.error(f"Error updating allowed domains: {e}")
             raise ConfigurationError(f"Failed to update allowed domains: {e}")

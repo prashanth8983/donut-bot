@@ -5,7 +5,7 @@ Handles HTTP requests for configuration management operations.
 
 from typing import List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 
 from ....services.config_service import get_config_service, ConfigService
 from ....db.schemas import CrawlerConfigModel
@@ -20,6 +20,12 @@ class UpdateDomainsRequest(BaseModel):
     """Request model for updating allowed domains."""
     action: str  # 'add', 'remove', or 'replace'
     domains: List[str]
+    
+    @validator('action')
+    def validate_action(cls, v):
+        if v not in ['add', 'remove', 'replace']:
+            raise ValueError("Invalid action. Must be 'add', 'remove', or 'replace'")
+        return v
 
 
 @router.get("/")
@@ -94,11 +100,13 @@ async def update_allowed_domains(
         logger.info(f"Updated allowed domains: {result['message']}")
         return result
     except ValueError as e:
+        logger.error(f"Validation error updating allowed domains: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
     except ConfigurationError as e:
+        logger.error(f"Configuration error updating allowed domains: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)

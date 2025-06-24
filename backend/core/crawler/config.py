@@ -16,7 +16,7 @@ class CrawlerConfigModel(BaseModel):
     output_topic: str = "raw-documents"
     enable_kafka_output: bool = False
     enable_local_save: bool = True
-    local_output_dir: str = "/app/crawler_output"
+    local_output_dir: str = "./crawler_output"
     
     # Redis settings
     redis_host: str = "redis"
@@ -106,7 +106,7 @@ class CrawlerConfig:
     output_topic: str = "raw-documents"
     enable_kafka_output: bool = False
     enable_local_save: bool = True
-    local_output_dir: str = "/app/crawler_output"
+    local_output_dir: str = "./crawler_output"
     redis_host: str = "redis"
     redis_port: int = 6379
     redis_db: int = 0

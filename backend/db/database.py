@@ -43,7 +43,7 @@ class Database:
     
     def get_collection(self, collection_name: str):
         """Get a MongoDB collection."""
-        if not self.database:
+        if self.database is None:
             raise DatabaseError("Database not connected")
         return self.database[collection_name]
 

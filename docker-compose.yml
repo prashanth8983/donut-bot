@@ -3,21 +3,21 @@ version: '3.8'
 services:
   # Redis for URL frontier and state management
   redis:
-    image: redis:7-alpine
-    container_name: webcrawler-redis
+    image: redis:7.2-alpine
+    container_name: donut-bot-redis
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes
     networks:
-      - webcrawler-network
+      - donut-bot-network
     restart: unless-stopped
 
   # MongoDB for job management and persistent storage
   mongodb:
-    image: mongo:6
-    container_name: webcrawler-mongodb
+    image: mongo:7.0
+    container_name: donut-bot-mongodb
     ports:
       - "27017:27017"
     environment:
@@ -26,10 +26,9 @@ services:
       MONGO_INITDB_DATABASE: webcrawler
     volumes:
       - mongodb_data:/data/db
-      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
-    restart: unless-stopped
     networks:
-      - webcrawler-network
+      - donut-bot-network
+    restart: unless-stopped
 
   # Zookeeper for Kafka
   zookeeper:
@@ -45,7 +44,7 @@ services:
       - zookeeper_data:/var/lib/zookeeper/data
       - zookeeper_logs:/var/lib/zookeeper/log
     networks:
-      - webcrawler-network
+      - donut-bot-network
     restart: unless-stopped
 
   # Kafka for document streaming
@@ -75,7 +74,7 @@ services:
     volumes:
       - kafka_data:/var/lib/kafka/data
     networks:
-      - webcrawler-network
+      - donut-bot-network
     restart: unless-stopped
 
   # Kafka UI for monitoring (optional)
@@ -91,7 +90,7 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
     networks:
-      - webcrawler-network
+      - donut-bot-network
     restart: unless-stopped
     profiles:
       - monitoring
@@ -107,7 +106,7 @@ services:
     environment:
       REDIS_HOSTS: local:redis:6379
     networks:
-      - webcrawler-network
+      - donut-bot-network
     restart: unless-stopped
     profiles:
       - monitoring
@@ -162,7 +161,7 @@ services:
       - ./logs:/app/logs
       - ./output:/app/crawler_output
     networks:
-      - webcrawler-network
+      - donut-bot-network
     restart: unless-stopped
     command: python api_crawler.py
 
@@ -182,7 +181,7 @@ services:
       - webcrawler-api
     restart: unless-stopped
     networks:
-      - webcrawler-network
+      - donut-bot-network
 
 volumes:
   redis_data:
@@ -192,5 +191,5 @@ volumes:
   kafka_data:
 
 networks:
-  webcrawler-network:
+  donut-bot-network:
     driver: bridge
