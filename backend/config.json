@@ -1,0 +1,33 @@
+{
+  "app_name": "Donut Bot API",
+  "app_version": "1.0.0",
+  "debug": true,
+  "host": "0.0.0.0",
+  "port": 8089,
+  "mongo_uri": "mongodb://admin:password123@localhost:27017/webcrawler?authSource=admin",
+  "database_name": "webcrawler",
+  "redis_host": "localhost",
+  "redis_port": 6379,
+  "redis_db": 0,
+  "kafka_brokers": "localhost:9092",
+  "kafka_topic": "raw-documents",
+  "enable_kafka_output": false,
+  "enable_local_save": true,
+  "local_output_dir": "./crawler_output",
+  "default_workers": 3,
+  "default_max_depth": 3,
+  "default_max_pages": 4000,
+  "default_delay": 2.0,
+  "default_allowed_domains": [
+    "northeastern.edu",
+    "nyu.edu",
+    "stanford.edu"
+  ],
+  "secret_key": "your-secret-key-here",
+  "access_token_expire_minutes": 30,
+  "cors_origins": [
+    "http://localhost:3000",
+    "http://localhost:8080"
+  ],
+  "log_level": "DEBUG"
+} 
