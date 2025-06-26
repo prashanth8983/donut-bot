@@ -22,6 +22,8 @@ export const Jobs: React.FC<JobsProps> = ({ onRefresh }) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [deleteJobId, setDeleteJobId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [currentTime, setCurrentTime] = useState(Date.now());
+  const [selectedJob, setSelectedJob] = useState<CrawlJob | null>(null);
 
   const jobsApi = useApi<JobsApiResponse>();
   const createJobApi = useApi<CrawlJob>();
@@ -37,7 +39,15 @@ export const Jobs: React.FC<JobsProps> = ({ onRefresh }) => {
 
   useEffect(() => {
     fetchJobs();
-  }, [filterStatus, filterPriority]);
+    const interval = setInterval(fetchJobs, 3000); // Update every 3 seconds
+    return () => clearInterval(interval);
+  }, []);
+
+  // Timer effect: update currentTime every second
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const handleRefresh = () => {
     fetchJobs();
@@ -209,103 +219,129 @@ export const Jobs: React.FC<JobsProps> = ({ onRefresh }) => {
                   <th className={`px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider ${isDarkMode ? 'text-stone-300' : 'text-gray-600'}`}>Name</th>
                   <th className={`px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider ${isDarkMode ? 'text-stone-300' : 'text-gray-600'}`}>Domain</th>
                   <th className={`px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider ${isDarkMode ? 'text-stone-300' : 'text-gray-600'}`}>Status</th>
+                  <th className={`px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider ${isDarkMode ? 'text-stone-300' : 'text-gray-600'}`}>Elapsed</th>
                   <th className={`px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider ${isDarkMode ? 'text-stone-300' : 'text-gray-600'}`}>Progress</th>
+                  <th className={`px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider ${isDarkMode ? 'text-stone-300' : 'text-gray-600'}`}>Pages Crawled</th>
+                  <th className={`px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider ${isDarkMode ? 'text-stone-300' : 'text-gray-600'}`}>Errors</th>
                   <th className={`px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider ${isDarkMode ? 'text-stone-300' : 'text-gray-600'}`}>Priority</th>
                   <th className={`px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider ${isDarkMode ? 'text-stone-300' : 'text-gray-600'}`}>Actions</th>
+                  <th className={`px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider ${isDarkMode ? 'text-stone-300' : 'text-gray-600'}`}></th>
                 </tr>
               </thead>
               <tbody>
-                {filteredJobs.map((job, idx) => (
-                  <tr
-                    key={job.id}
-                    className={
-                      isDarkMode
-                        ? `${idx % 2 === 0 ? 'bg-stone-800' : 'bg-stone-700'} hover:bg-blue-900/30 transition`
-                        : `${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 transition`
+                {filteredJobs.map((job, idx) => {
+                  // Calculate elapsed time
+                  let elapsed = '-';
+                  if (job.startTime) {
+                    const start = new Date(job.startTime).getTime();
+                    let end = currentTime;
+                    if (job.status === 'completed' && job.estimatedEnd) {
+                      end = new Date(job.estimatedEnd).getTime();
                     }
-                  >
-                    <td className={`px-2 py-2 whitespace-nowrap font-medium ${isDarkMode ? 'text-stone-100' : ''}`}>{job.name}</td>
-                    <td className={`px-2 py-2 whitespace-nowrap ${isDarkMode ? 'text-stone-200' : ''}`}>{job.domain}</td>
-                    <td className="px-2 py-2 whitespace-nowrap">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        job.status === 'running'
-                          ? isDarkMode
+                    const diff = Math.max(0, Math.floor((end - start) / 1000));
+                    const h = Math.floor(diff / 3600);
+                    const m = Math.floor((diff % 3600) / 60);
+                    const s = diff % 60;
+                    elapsed = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+                  }
+                  return (
+                    <tr
+                      key={job.id}
+                      className={
+                        isDarkMode
+                          ? `${idx % 2 === 0 ? 'bg-stone-800' : 'bg-stone-700'} hover:bg-blue-900/30 transition`
+                          : `${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 transition`
+                      }
+                    >
+                      <td className={`px-2 py-2 whitespace-nowrap font-medium ${isDarkMode ? 'text-stone-100' : ''}`}>{job.name}</td>
+                      <td className={`px-2 py-2 whitespace-nowrap ${isDarkMode ? 'text-stone-200' : ''}`}>{job.domain}</td>
+                      <td className="px-2 py-2 whitespace-nowrap">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          job.status === 'running'
+                            ? isDarkMode
+                              ? 'bg-green-900/50 text-green-300'
+                              : 'bg-green-100 text-green-800'
+                            : job.status === 'completed'
+                            ? isDarkMode
+                              ? 'bg-blue-900/50 text-blue-300'
+                              : 'bg-blue-100 text-blue-800'
+                            : job.status === 'paused'
+                            ? isDarkMode
+                              ? 'bg-yellow-900/50 text-yellow-300'
+                              : 'bg-yellow-100 text-yellow-800'
+                            : job.status === 'failed'
+                            ? isDarkMode
+                              ? 'bg-red-900/50 text-red-300'
+                              : 'bg-red-100 text-red-800'
+                            : isDarkMode
+                            ? 'bg-stone-700 text-stone-300'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>{job.status}</span>
+                      </td>
+                      <td className={`px-2 py-2 whitespace-nowrap ${isDarkMode ? 'text-stone-200' : ''}`}>{elapsed}</td>
+                      <td className={`px-2 py-2 whitespace-nowrap ${isDarkMode ? 'text-stone-200' : ''}`}>
+                        <div className="flex items-center gap-2">
+                          <span>{job.progress.toFixed(1)}%</span>
+                          <div className={`${isDarkMode ? 'bg-stone-600' : 'bg-gray-200'} w-24 rounded-full h-2`}>
+                            <div className="bg-blue-600 h-2 rounded-full transition-all duration-300" style={{ width: `${job.progress}%` }}></div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-2 py-2 whitespace-nowrap">{typeof job.pagesFound === 'number' ? job.pagesFound.toLocaleString() : '-'}</td>
+                      <td className="px-2 py-2 whitespace-nowrap">{typeof job.errors === 'number' ? job.errors.toLocaleString() : '-'}</td>
+                      <td className="px-2 py-2 whitespace-nowrap">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          job.priority === 'high'
+                            ? isDarkMode
+                              ? 'bg-red-900/50 text-red-300'
+                              : 'bg-red-100 text-red-800'
+                            : job.priority === 'medium'
+                            ? isDarkMode
+                              ? 'bg-yellow-900/50 text-yellow-300'
+                              : 'bg-yellow-100 text-yellow-800'
+                            : isDarkMode
                             ? 'bg-green-900/50 text-green-300'
                             : 'bg-green-100 text-green-800'
-                          : job.status === 'completed'
-                          ? isDarkMode
-                            ? 'bg-blue-900/50 text-blue-300'
-                            : 'bg-blue-100 text-blue-800'
-                          : job.status === 'paused'
-                          ? isDarkMode
-                            ? 'bg-yellow-900/50 text-yellow-300'
-                            : 'bg-yellow-100 text-yellow-800'
-                          : job.status === 'failed'
-                          ? isDarkMode
-                            ? 'bg-red-900/50 text-red-300'
-                            : 'bg-red-100 text-red-800'
-                          : isDarkMode
-                          ? 'bg-stone-700 text-stone-300'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>{job.status}</span>
-                    </td>
-                    <td className={`px-2 py-2 whitespace-nowrap ${isDarkMode ? 'text-stone-200' : ''}`}>
-                      <div className="flex items-center gap-2">
-                        <span>{job.progress}%</span>
-                        <div className={`${isDarkMode ? 'bg-stone-600' : 'bg-gray-200'} w-24 rounded-full h-2`}>
-                          <div className="bg-blue-600 h-2 rounded-full transition-all duration-300" style={{ width: `${job.progress}%` }}></div>
+                        }`}>{job.priority}</span>
+                      </td>
+                      <td className="px-2 py-2 whitespace-nowrap">
+                        <div className="flex gap-1">
+                          {job.status === 'running' && (
+                            <button onClick={() => handleJobAction(job.id, 'pause')} className={`p-1 ${isDarkMode ? 'text-yellow-300 hover:bg-yellow-900/30' : 'text-yellow-600 hover:bg-yellow-50'} rounded transition-colors`} title="Pause">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                            </button>
+                          )}
+                          {job.status === 'paused' && (
+                            <button onClick={() => handleJobAction(job.id, 'resume')} className={`p-1 ${isDarkMode ? 'text-green-300 hover:bg-green-900/30' : 'text-green-600 hover:bg-green-50'} rounded transition-colors`} title="Resume">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21 5,3"/></svg>
+                            </button>
+                          )}
+                          {job.status === 'queued' && (
+                            <button onClick={() => handleJobAction(job.id, 'start')} className={`p-1 ${isDarkMode ? 'text-green-300 hover:bg-green-900/30' : 'text-green-600 hover:bg-green-50'} rounded transition-colors`} title="Start">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21 5,3"/></svg>
+                            </button>
+                          )}
+                          {(job.status === 'running' || job.status === 'paused') && (
+                            <button onClick={() => handleJobAction(job.id, 'stop')} className={`p-1 ${isDarkMode ? 'text-red-300 hover:bg-red-900/30' : 'text-red-600 hover:bg-red-50'} rounded transition-colors`} title="Stop">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg>
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setDeleteJobId(job.id)}
+                            className={`p-1 ${isDarkMode ? 'text-red-300 hover:bg-red-900/30' : 'text-red-600 hover:bg-red-50'} rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
+                            title={job.status === 'running' ? 'Stop the job before deleting' : 'Delete Job'}
+                            disabled={deleting || job.status === 'running'}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-2 py-2 whitespace-nowrap">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        job.priority === 'high'
-                          ? isDarkMode
-                            ? 'bg-red-900/50 text-red-300'
-                            : 'bg-red-100 text-red-800'
-                          : job.priority === 'medium'
-                          ? isDarkMode
-                            ? 'bg-yellow-900/50 text-yellow-300'
-                            : 'bg-yellow-100 text-yellow-800'
-                          : isDarkMode
-                          ? 'bg-green-900/50 text-green-300'
-                          : 'bg-green-100 text-green-800'
-                      }`}>{job.priority}</span>
-                    </td>
-                    <td className="px-2 py-2 whitespace-nowrap">
-                      <div className="flex gap-1">
-                        {job.status === 'running' && (
-                          <button onClick={() => handleJobAction(job.id, 'pause')} className={`p-1 ${isDarkMode ? 'text-yellow-300 hover:bg-yellow-900/30' : 'text-yellow-600 hover:bg-yellow-50'} rounded transition-colors`} title="Pause">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-                          </button>
-                        )}
-                        {job.status === 'paused' && (
-                          <button onClick={() => handleJobAction(job.id, 'resume')} className={`p-1 ${isDarkMode ? 'text-green-300 hover:bg-green-900/30' : 'text-green-600 hover:bg-green-50'} rounded transition-colors`} title="Resume">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21 5,3"/></svg>
-                          </button>
-                        )}
-                        {job.status === 'queued' && (
-                          <button onClick={() => handleJobAction(job.id, 'start')} className={`p-1 ${isDarkMode ? 'text-green-300 hover:bg-green-900/30' : 'text-green-600 hover:bg-green-50'} rounded transition-colors`} title="Start">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21 5,3"/></svg>
-                          </button>
-                        )}
-                        {(job.status === 'running' || job.status === 'paused') && (
-                          <button onClick={() => handleJobAction(job.id, 'stop')} className={`p-1 ${isDarkMode ? 'text-red-300 hover:bg-red-900/30' : 'text-red-600 hover:bg-red-50'} rounded transition-colors`} title="Stop">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg>
-                          </button>
-                        )}
-                        <button
-                          onClick={() => setDeleteJobId(job.id)}
-                          className={`p-1 ${isDarkMode ? 'text-red-300 hover:bg-red-900/30' : 'text-red-600 hover:bg-red-50'} rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
-                          title={job.status === 'running' ? 'Stop the job before deleting' : 'Delete Job'}
-                          disabled={deleting || job.status === 'running'}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-2 py-2 whitespace-nowrap">
+                        <button onClick={() => setSelectedJob(job)} className={`px-2 py-1 rounded text-xs font-medium ${isDarkMode ? 'bg-blue-900/50 text-blue-200 hover:bg-blue-800' : 'bg-blue-100 text-blue-800 hover:bg-blue-200'}`}>Details</button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -356,6 +392,52 @@ export const Jobs: React.FC<JobsProps> = ({ onRefresh }) => {
                 >
                   {deleting ? 'Deleting...' : 'Delete'}
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Job Details Modal */}
+        {selectedJob && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className={`rounded-lg shadow-xl p-8 w-full max-w-lg ${isDarkMode ? 'bg-stone-800 border border-stone-700' : 'bg-white border border-gray-200'}`}> 
+              <h3 className={`text-xl font-bold mb-4 ${isDarkMode ? 'text-stone-100' : 'text-gray-900'}`}>Job Details</h3>
+              <div className="space-y-2 text-sm">
+                <div><span className="font-semibold">Name:</span> {selectedJob.name}</div>
+                <div><span className="font-semibold">Domain:</span> {selectedJob.domain}</div>
+                <div><span className="font-semibold">Status:</span> {selectedJob.status}</div>
+                <div><span className="font-semibold">Priority:</span> {selectedJob.priority}</div>
+                <div><span className="font-semibold">Category:</span> {selectedJob.category}</div>
+                <div><span className="font-semibold">Elapsed:</span> {(() => {
+                  let elapsed = '-';
+                  if (selectedJob.startTime) {
+                    const start = new Date(selectedJob.startTime).getTime();
+                    let end = currentTime;
+                    if (selectedJob.status === 'completed' && selectedJob.estimatedEnd) {
+                      end = new Date(selectedJob.estimatedEnd).getTime();
+                    }
+                    const diff = Math.max(0, Math.floor((end - start) / 1000));
+                    const h = Math.floor(diff / 3600);
+                    const m = Math.floor((diff % 3600) / 60);
+                    const s = diff % 60;
+                    elapsed = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+                  }
+                  return elapsed;
+                })()}</div>
+                <div><span className="font-semibold">Pages Crawled:</span> {selectedJob.pagesFound}</div>
+                <div><span className="font-semibold">Errors:</span> {selectedJob.errors}</div>
+                <div><span className="font-semibold">Progress:</span> {selectedJob.progress.toFixed(1)}%</div>
+                <div><span className="font-semibold">Data Size:</span> {selectedJob.dataSize}</div>
+                <div><span className="font-semibold">Avg Response Time:</span> {selectedJob.avgResponseTime}</div>
+                <div><span className="font-semibold">Success Rate:</span> {selectedJob.successRate}%</div>
+                <div><span className="font-semibold">Start Time:</span> {selectedJob.startTime ? new Date(selectedJob.startTime).toLocaleString() : '-'}</div>
+                <div><span className="font-semibold">End Time:</span> {selectedJob.estimatedEnd ? new Date(selectedJob.estimatedEnd).toLocaleString() : '-'}</div>
+                <div><span className="font-semibold">Max Pages:</span> {selectedJob.config?.max_pages ?? '-'}</div>
+                <div><span className="font-semibold">Max Depth:</span> {selectedJob.config?.max_depth ?? '-'}</div>
+                <div><span className="font-semibold">Allowed Domains:</span> {selectedJob.config?.allowed_domains?.join(', ') ?? '-'}</div>
+              </div>
+              <div className="mt-6 flex justify-end">
+                <button onClick={() => setSelectedJob(null)} className={`px-4 py-2 rounded-lg ${isDarkMode ? 'bg-stone-700 text-stone-100 hover:bg-stone-600' : 'bg-gray-200 text-gray-900 hover:bg-gray-300'}`}>Close</button>
               </div>
             </div>
           </div>

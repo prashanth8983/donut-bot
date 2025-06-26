@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import {  RefreshCw, Activity, Globe, Database, AlertCircle, TrendingUp } from 'lucide-react';
+import {  RefreshCw, Activity, Globe, Database,  TrendingUp } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { apiService } from '../services/api';
 import type { CrawlerStatus, CrawlJob, Metrics, QueueStatus } from '../types';
@@ -7,13 +7,12 @@ import { StatCard } from './StatCard';
 import { useDashboard } from '../contexts/DashboardContext';
 
 export const Dashboard: React.FC = () => {
-  const { isDarkMode } = useDashboard();
+  const { isDarkMode, showNotification } = useDashboard();
   const [crawlerStatus, setCrawlerStatus] = useState<CrawlerStatus | null>(null);
   const [crawlJobs, setCrawlJobs] = useState<CrawlJob[]>([]);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [queueStatus, setQueueStatus] = useState<QueueStatus | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const [performanceData, setPerformanceData] = useState([
     { time: '00:00', pages: 0, errors: 0, cache: 0, bandwidth: 0 },
@@ -24,39 +23,48 @@ export const Dashboard: React.FC = () => {
     { time: '20:00', pages: 0, errors: 0, cache: 0, bandwidth: 0 }
   ]);
   
+
   const fetchData = async () => {
-    setLoading(true);
-    setError(null);
     try {
-      const [statusRes, jobsRes, metricsRes, queueRes] = await Promise.all([
+      const [crawlerStatusRes, jobsRes, metricsRes, queueStatusRes] = await Promise.all([
         apiService.getCrawlerStatus(),
         apiService.getJobs(),
         apiService.getMetrics(),
-        apiService.getQueueStatus()
+        apiService.getQueueStatus(),
       ]);
-
-      if (statusRes.success) setCrawlerStatus(statusRes.data || null);
-      else setError(statusRes.error || 'Failed to fetch status');
-      
-      if (jobsRes.success) setCrawlJobs(jobsRes.data?.jobs || []);
-      else setError(jobsRes.error || 'Failed to fetch jobs');
-      
-      if (metricsRes.success) setMetrics(metricsRes.data || null);
-      else setError(metricsRes.error || 'Failed to fetch metrics');
-      
-      if (queueRes.success) setQueueStatus(queueRes.data || null);
-      else setError(queueRes.error || 'Failed to fetch queue status');
-      
+      if (!crawlerStatusRes.success) {
+        showNotification(`Failed to fetch crawler status: ${crawlerStatusRes.error}`, 'error');
+      }
+      if (!jobsRes.success) {
+        showNotification(`Failed to fetch jobs: ${jobsRes.error}`, 'error');
+      }
+      if (!metricsRes.success) {
+        showNotification(`Failed to fetch metrics: ${metricsRes.error}`, 'error');
+      }
+      if (!queueStatusRes.success) {
+        showNotification(`Failed to fetch queue status: ${queueStatusRes.error}`, 'error');
+      }
+      setCrawlerStatus(crawlerStatusRes.success && crawlerStatusRes.data ? crawlerStatusRes.data : null);
+      setCrawlJobs(jobsRes.success && jobsRes.data ? jobsRes.data.jobs : []);
+      setMetrics(metricsRes.success && metricsRes.data ? metricsRes.data : null);
+      setQueueStatus(queueStatusRes.success && queueStatusRes.data ? queueStatusRes.data : null);
     } catch (err) {
-      setError('An unexpected error occurred while fetching data.');
+      showNotification('Unexpected error occurred while loading dashboard', 'error');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    setLoading(true);
     fetchData();
-    const interval = setInterval(fetchData, 10000); // Refresh every 10 seconds
+  }, [showNotification]);
+
+  // Auto-refresh every 3 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchData();
+    }, 3000);
     return () => clearInterval(interval);
   }, []);
 
@@ -84,12 +92,17 @@ export const Dashboard: React.FC = () => {
     }
   }, [crawlerStatus, metrics]);
 
+  const handleRefresh = () => {
+    setLoading(true);
+    fetchData();
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className={`text-2xl font-bold ${isDarkMode ? 'text-stone-100' : 'text-gray-900'}`}>Dashboard Overview</h1>
         <button
-          onClick={fetchData}
+          onClick={handleRefresh}
           disabled={loading}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
         >
@@ -98,17 +111,10 @@ export const Dashboard: React.FC = () => {
         </button>
       </div>
       
-      {error && (
-        <div className={`${isDarkMode ? 'bg-red-900/50 border-red-700 text-red-200' : 'bg-red-100 border-red-200 text-red-800'} border p-4 rounded-lg flex items-center gap-2`}>
-          <AlertCircle className="w-5 h-5" />
-          <span>Error: {error}</span>
-        </div>
-      )}
-
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         <StatCard
           title="Total Pages Crawled"
-          value={crawlerStatus?.pages_crawled_total.toLocaleString() ?? '0'}
+          value={typeof crawlerStatus?.pages_crawled_total === 'number' ? crawlerStatus.pages_crawled_total.toLocaleString() : '0'}
           icon={Globe}
           trend={`${Math.round(crawlerStatus?.avg_pages_per_second ?? 0)}/s`}
         />
@@ -154,42 +160,26 @@ export const Dashboard: React.FC = () => {
 
         <div className={`${isDarkMode ? 'bg-stone-800 border-stone-700' : 'bg-white border-gray-200'} p-6 rounded-lg border`}>
           <h2 className={`text-lg font-semibold ${isDarkMode ? 'text-stone-100' : 'text-gray-900'} mb-4`}>System Resources</h2>
-          <div className="space-y-4">
-            <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span className={`font-medium ${isDarkMode ? 'text-stone-300' : 'text-gray-700'}`}>Queue Size</span>
-                <span className={isDarkMode ? 'text-stone-200' : 'text-gray-900'}>{queueStatus?.queue_size.toLocaleString() ?? '0'}</span>
-              </div>
-              <div className={`w-full ${isDarkMode ? 'bg-stone-600' : 'bg-gray-200'} rounded-full h-2.5`}>
-                <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${(queueStatus?.queue_size ?? 0) / 1000 * 100}%` }}></div>
-              </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {/* Queue Size */}
+            <div className={`${isDarkMode ? 'bg-blue-900/50' : 'bg-blue-50'} rounded-lg p-4 flex flex-col items-center`}>
+              <div className={`text-3xl font-bold ${isDarkMode ? 'text-blue-300' : 'text-blue-600'}`}>{typeof queueStatus?.queue_size === 'number' ? queueStatus.queue_size.toLocaleString() : '0'}</div>
+              <div className={`text-sm mt-2 ${isDarkMode ? 'text-blue-200' : 'text-blue-700'}`}>Queue Size</div>
             </div>
-            <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span className={`font-medium ${isDarkMode ? 'text-stone-300' : 'text-gray-700'}`}>Processing</span>
-                <span className={isDarkMode ? 'text-stone-200' : 'text-gray-900'}>{queueStatus?.processing_urls.toLocaleString() ?? '0'}</span>
-              </div>
-              <div className={`w-full ${isDarkMode ? 'bg-stone-600' : 'bg-gray-200'} rounded-full h-2.5`}>
-                <div className="bg-yellow-500 h-2.5 rounded-full" style={{ width: `${(queueStatus?.processing_urls ?? 0) / 100 * 100}%` }}></div>
-              </div>
+            {/* Processing */}
+            <div className={`${isDarkMode ? 'bg-yellow-900/50' : 'bg-yellow-50'} rounded-lg p-4 flex flex-col items-center`}>
+              <div className={`text-3xl font-bold ${isDarkMode ? 'text-yellow-300' : 'text-yellow-600'}`}>{typeof queueStatus?.processing_urls === 'number' ? queueStatus.processing_urls.toLocaleString() : '0'}</div>
+              <div className={`text-sm mt-2 ${isDarkMode ? 'text-yellow-200' : 'text-yellow-700'}`}>Processing</div>
             </div>
-            <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span className={`font-medium ${isDarkMode ? 'text-stone-300' : 'text-gray-700'}`}>Completed</span>
-                <span className={isDarkMode ? 'text-stone-200' : 'text-gray-900'}>{queueStatus?.completed_urls.toLocaleString() ?? '0'}</span>
-              </div>
-              <div className={`w-full ${isDarkMode ? 'bg-stone-600' : 'bg-gray-200'} rounded-full h-2.5`}>
-                <div className="bg-green-600 h-2.5 rounded-full" style={{ width: `${(queueStatus?.completed_urls ?? 0) / 10000 * 100}%` }}></div>
-              </div>
+            {/* Completed */}
+            <div className={`${isDarkMode ? 'bg-green-900/50' : 'bg-green-50'} rounded-lg p-4 flex flex-col items-center`}>
+              <div className={`text-3xl font-bold ${isDarkMode ? 'text-green-300' : 'text-green-600'}`}>{typeof queueStatus?.completed_urls === 'number' ? queueStatus.completed_urls.toLocaleString() : '0'}</div>
+              <div className={`text-sm mt-2 ${isDarkMode ? 'text-green-200' : 'text-green-700'}`}>Completed</div>
             </div>
-            <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span className={`font-medium ${isDarkMode ? 'text-stone-300' : 'text-gray-700'}`}>Errors</span>
-                <span className={isDarkMode ? 'text-stone-200' : 'text-gray-900'}>{crawlerStatus?.total_errors_count.toLocaleString() ?? '0'}</span>
-              </div>
-              <div className={`w-full ${isDarkMode ? 'bg-stone-600' : 'bg-gray-200'} rounded-full h-2.5`}>
-                <div className="bg-red-600 h-2.5 rounded-full" style={{ width: `${(crawlerStatus?.total_errors_count ?? 0) / 100 * 100}%` }}></div>
-              </div>
+            {/* Errors */}
+            <div className={`${isDarkMode ? 'bg-red-900/50' : 'bg-red-50'} rounded-lg p-4 flex flex-col items-center`}>
+              <div className={`text-3xl font-bold ${isDarkMode ? 'text-red-300' : 'text-red-600'}`}>{typeof crawlerStatus?.total_errors_count === 'number' ? crawlerStatus.total_errors_count.toLocaleString() : '0'}</div>
+              <div className={`text-sm mt-2 ${isDarkMode ? 'text-red-200' : 'text-red-700'}`}>Errors</div>
             </div>
           </div>
         </div>

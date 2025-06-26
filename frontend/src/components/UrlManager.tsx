@@ -13,7 +13,7 @@ export const UrlManager: React.FC = () => {
 
   useEffect(() => {
     fetchQueueStatus();
-    const interval = setInterval(fetchQueueStatus, 5000); // Update every 5 seconds
+    const interval = setInterval(fetchQueueStatus, 3000); // Update every 3 seconds
     return () => clearInterval(interval);
   }, []);
 
@@ -140,28 +140,28 @@ export const UrlManager: React.FC = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className={`${isDarkMode ? 'bg-blue-900/50' : 'bg-blue-50'} rounded-lg p-4`}>
               <div className={`text-2xl font-bold ${isDarkMode ? 'text-blue-300' : 'text-blue-600'}`}>
-                {queueStatus.queue_size.toLocaleString()}
+                {typeof queueStatus.queue_size === 'number' ? queueStatus.queue_size.toLocaleString() : '0'}
               </div>
               <div className={`text-sm ${isDarkMode ? 'text-blue-200' : 'text-blue-700'}`}>In Queue</div>
             </div>
             
             <div className={`${isDarkMode ? 'bg-yellow-900/50' : 'bg-yellow-50'} rounded-lg p-4`}>
               <div className={`text-2xl font-bold ${isDarkMode ? 'text-yellow-300' : 'text-yellow-600'}`}>
-                {queueStatus.processing_urls.toLocaleString()}
+                {typeof queueStatus.processing_urls === 'number' ? queueStatus.processing_urls.toLocaleString() : '0'}
               </div>
               <div className={`text-sm ${isDarkMode ? 'text-yellow-200' : 'text-yellow-700'}`}>Processing</div>
             </div>
             
             <div className={`${isDarkMode ? 'bg-green-900/50' : 'bg-green-50'} rounded-lg p-4`}>
               <div className={`text-2xl font-bold ${isDarkMode ? 'text-green-300' : 'text-green-600'}`}>
-                {queueStatus.completed_urls.toLocaleString()}
+                {typeof queueStatus.completed_urls === 'number' ? queueStatus.completed_urls.toLocaleString() : '0'}
               </div>
               <div className={`text-sm ${isDarkMode ? 'text-green-200' : 'text-green-700'}`}>Completed</div>
             </div>
             
             <div className={`${isDarkMode ? 'bg-stone-700' : 'bg-gray-50'} rounded-lg p-4`}>
               <div className={`text-2xl font-bold ${isDarkMode ? 'text-stone-300' : 'text-gray-600'}`}>
-                {queueStatus.seen_urls.toLocaleString()}
+                {typeof queueStatus.seen_urls === 'number' ? queueStatus.seen_urls.toLocaleString() : '0'}
               </div>
               <div className={`text-sm ${isDarkMode ? 'text-stone-400' : 'text-gray-700'}`}>Seen</div>
             </div>
@@ -257,7 +257,7 @@ export const UrlManager: React.FC = () => {
           </p>
           <button
             onClick={handleClearUrls}
-            disabled={clearing || !queueStatus || queueStatus.queue_size === 0}
+            disabled={clearing || !queueStatus || typeof queueStatus.queue_size !== 'number' || queueStatus.queue_size === 0}
             className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Trash2 className="w-4 h-4" />
