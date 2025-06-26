@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Loader2 } from 'lucide-react';
-import { JobCard } from './JobCard';
+import { Search, Plus, Loader2, Trash2 } from 'lucide-react';
 import { useApi } from '../hooks/useApi';
 import { apiService } from '../services/api';
 import type { CrawlJob } from '../types';
@@ -21,6 +20,8 @@ export const Jobs: React.FC<JobsProps> = ({ onRefresh }) => {
   const [filterPriority, setFilterPriority] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [deleteJobId, setDeleteJobId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const jobsApi = useApi<JobsApiResponse>();
   const createJobApi = useApi<CrawlJob>();
@@ -74,11 +75,24 @@ export const Jobs: React.FC<JobsProps> = ({ onRefresh }) => {
     }
   };
 
-  const filteredJobs = jobsApi.data?.jobs?.filter(job => {
-    const matchesSearch = job.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         job.domain.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesSearch;
-  }) || [];
+  const handleDeleteJob = async (jobId: string) => {
+    setDeleting(true);
+    await apiService.deleteJob(jobId);
+    setDeleting(false);
+    setDeleteJobId(null);
+    fetchJobs();
+  };
+
+  // Filtering logic
+  const filteredJobs = (jobsApi.data?.jobs || [])
+    .filter(job => {
+      const matchesSearch =
+        job.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        job.domain.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesStatus = filterStatus === 'all' || job.status === filterStatus;
+      const matchesPriority = filterPriority === 'all' || job.priority === filterPriority;
+      return matchesSearch && matchesStatus && matchesPriority;
+    });
 
   return (
     <div className="space-y-6">
@@ -94,7 +108,7 @@ export const Jobs: React.FC<JobsProps> = ({ onRefresh }) => {
           </button>
         </div>
 
-        <div className="flex items-center gap-4 mb-6">
+        <div className="flex flex-wrap items-center gap-4 mb-6">
           <div className="relative">
             <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${isDarkMode ? 'text-stone-400' : 'text-gray-400'} w-4 h-4`} />
             <input
@@ -159,70 +173,194 @@ export const Jobs: React.FC<JobsProps> = ({ onRefresh }) => {
             {jobsApi.loading ? 'Loading...' : 'Refresh'}
           </button>
         </div>
-      </div>
 
-      {jobsApi.loading && !jobsApi.data && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className={`${isDarkMode ? 'bg-stone-800 border-stone-700' : 'bg-white border-gray-200'} p-6 rounded-lg border animate-pulse`}>
-              <div className={`h-4 ${isDarkMode ? 'bg-stone-600' : 'bg-gray-200'} rounded w-3/4 mb-2`}></div>
-              <div className={`h-6 ${isDarkMode ? 'bg-stone-600' : 'bg-gray-200'} rounded w-1/2 mb-4`}></div>
-              <div className={`h-2 ${isDarkMode ? 'bg-stone-600' : 'bg-gray-200'} rounded w-full mb-2`}></div>
-              <div className={`h-2 ${isDarkMode ? 'bg-stone-600' : 'bg-gray-200'} rounded w-2/3`}></div>
+        {jobsApi.loading && !jobsApi.data && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className={`${isDarkMode ? 'bg-stone-800 border-stone-700' : 'bg-white border-gray-200'} p-6 rounded-lg border animate-pulse`}>
+                <div className={`h-4 ${isDarkMode ? 'bg-stone-600' : 'bg-gray-200'} rounded w-3/4 mb-2`}></div>
+                <div className={`h-6 ${isDarkMode ? 'bg-stone-600' : 'bg-gray-200'} rounded w-1/2 mb-4`}></div>
+                <div className={`h-2 ${isDarkMode ? 'bg-stone-600' : 'bg-gray-200'} rounded w-full mb-2`}></div>
+                <div className={`h-2 ${isDarkMode ? 'bg-stone-600' : 'bg-gray-200'} rounded w-2/3`}></div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {jobsApi.error && (
+          <div className={`${isDarkMode ? 'bg-red-900/50 border-red-700' : 'bg-red-50 border-red-200'} border rounded-lg p-4`}>
+            <p className={isDarkMode ? 'text-red-200' : 'text-red-800'}>
+              Error loading jobs: {jobsApi.error}
+            </p>
+            <button 
+              onClick={handleRefresh}
+              className="mt-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {!jobsApi.loading && !jobsApi.error && (
+          <div className="overflow-x-auto">
+            <table className={`min-w-full divide-y rounded-lg shadow ${isDarkMode ? 'bg-stone-800 divide-stone-700' : 'bg-white divide-gray-200'}`}> 
+              <thead className={isDarkMode ? 'bg-stone-700' : 'bg-gray-100'}>
+                <tr>
+                  <th className={`px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider ${isDarkMode ? 'text-stone-300' : 'text-gray-600'}`}>Name</th>
+                  <th className={`px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider ${isDarkMode ? 'text-stone-300' : 'text-gray-600'}`}>Domain</th>
+                  <th className={`px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider ${isDarkMode ? 'text-stone-300' : 'text-gray-600'}`}>Status</th>
+                  <th className={`px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider ${isDarkMode ? 'text-stone-300' : 'text-gray-600'}`}>Progress</th>
+                  <th className={`px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider ${isDarkMode ? 'text-stone-300' : 'text-gray-600'}`}>Priority</th>
+                  <th className={`px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider ${isDarkMode ? 'text-stone-300' : 'text-gray-600'}`}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredJobs.map((job, idx) => (
+                  <tr
+                    key={job.id}
+                    className={
+                      isDarkMode
+                        ? `${idx % 2 === 0 ? 'bg-stone-800' : 'bg-stone-700'} hover:bg-blue-900/30 transition`
+                        : `${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 transition`
+                    }
+                  >
+                    <td className={`px-2 py-2 whitespace-nowrap font-medium ${isDarkMode ? 'text-stone-100' : ''}`}>{job.name}</td>
+                    <td className={`px-2 py-2 whitespace-nowrap ${isDarkMode ? 'text-stone-200' : ''}`}>{job.domain}</td>
+                    <td className="px-2 py-2 whitespace-nowrap">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        job.status === 'running'
+                          ? isDarkMode
+                            ? 'bg-green-900/50 text-green-300'
+                            : 'bg-green-100 text-green-800'
+                          : job.status === 'completed'
+                          ? isDarkMode
+                            ? 'bg-blue-900/50 text-blue-300'
+                            : 'bg-blue-100 text-blue-800'
+                          : job.status === 'paused'
+                          ? isDarkMode
+                            ? 'bg-yellow-900/50 text-yellow-300'
+                            : 'bg-yellow-100 text-yellow-800'
+                          : job.status === 'failed'
+                          ? isDarkMode
+                            ? 'bg-red-900/50 text-red-300'
+                            : 'bg-red-100 text-red-800'
+                          : isDarkMode
+                          ? 'bg-stone-700 text-stone-300'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>{job.status}</span>
+                    </td>
+                    <td className={`px-2 py-2 whitespace-nowrap ${isDarkMode ? 'text-stone-200' : ''}`}>
+                      <div className="flex items-center gap-2">
+                        <span>{job.progress}%</span>
+                        <div className={`${isDarkMode ? 'bg-stone-600' : 'bg-gray-200'} w-24 rounded-full h-2`}>
+                          <div className="bg-blue-600 h-2 rounded-full transition-all duration-300" style={{ width: `${job.progress}%` }}></div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-2 py-2 whitespace-nowrap">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        job.priority === 'high'
+                          ? isDarkMode
+                            ? 'bg-red-900/50 text-red-300'
+                            : 'bg-red-100 text-red-800'
+                          : job.priority === 'medium'
+                          ? isDarkMode
+                            ? 'bg-yellow-900/50 text-yellow-300'
+                            : 'bg-yellow-100 text-yellow-800'
+                          : isDarkMode
+                          ? 'bg-green-900/50 text-green-300'
+                          : 'bg-green-100 text-green-800'
+                      }`}>{job.priority}</span>
+                    </td>
+                    <td className="px-2 py-2 whitespace-nowrap">
+                      <div className="flex gap-1">
+                        {job.status === 'running' && (
+                          <button onClick={() => handleJobAction(job.id, 'pause')} className={`p-1 ${isDarkMode ? 'text-yellow-300 hover:bg-yellow-900/30' : 'text-yellow-600 hover:bg-yellow-50'} rounded transition-colors`} title="Pause">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                          </button>
+                        )}
+                        {job.status === 'paused' && (
+                          <button onClick={() => handleJobAction(job.id, 'resume')} className={`p-1 ${isDarkMode ? 'text-green-300 hover:bg-green-900/30' : 'text-green-600 hover:bg-green-50'} rounded transition-colors`} title="Resume">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21 5,3"/></svg>
+                          </button>
+                        )}
+                        {job.status === 'queued' && (
+                          <button onClick={() => handleJobAction(job.id, 'start')} className={`p-1 ${isDarkMode ? 'text-green-300 hover:bg-green-900/30' : 'text-green-600 hover:bg-green-50'} rounded transition-colors`} title="Start">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21 5,3"/></svg>
+                          </button>
+                        )}
+                        {(job.status === 'running' || job.status === 'paused') && (
+                          <button onClick={() => handleJobAction(job.id, 'stop')} className={`p-1 ${isDarkMode ? 'text-red-300 hover:bg-red-900/30' : 'text-red-600 hover:bg-red-50'} rounded transition-colors`} title="Stop">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg>
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setDeleteJobId(job.id)}
+                          className={`p-1 ${isDarkMode ? 'text-red-300 hover:bg-red-900/30' : 'text-red-600 hover:bg-red-50'} rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
+                          title={job.status === 'running' ? 'Stop the job before deleting' : 'Delete Job'}
+                          disabled={deleting || job.status === 'running'}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {!jobsApi.loading && !jobsApi.error && filteredJobs.length === 0 && (
+          <div className={`${isDarkMode ? 'bg-stone-800 border-stone-700' : 'bg-white border-gray-200'} p-12 rounded-lg border text-center`}>
+            <h3 className={`text-lg font-medium ${isDarkMode ? 'text-stone-100' : 'text-gray-900'} mb-2`}>No jobs found</h3>
+            <p className={`${isDarkMode ? 'text-stone-400' : 'text-gray-500'} mb-6`}>Try adjusting your filters or search terms.</p>
+            <button 
+              onClick={() => setShowCreateModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors mx-auto"
+            >
+              <Plus className="w-4 h-4" />
+              Create New Job
+            </button>
+          </div>
+        )}
+
+        {/* Create Job Modal */}
+        {showCreateModal && (
+          <CreateJobModal 
+            onClose={() => setShowCreateModal(false)}
+            onSubmit={handleCreateJob}
+            loading={createJobApi.loading}
+            error={createJobApi.error}
+          />
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {deleteJobId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className={`rounded-lg shadow-xl p-6 w-full max-w-sm ${isDarkMode ? 'bg-stone-800 border border-stone-700' : 'bg-white border border-gray-200'}`}> 
+              <h3 className={`text-lg font-semibold mb-2 ${isDarkMode ? 'text-stone-100' : 'text-gray-900'}`}>Delete Job?</h3>
+              <p className={isDarkMode ? 'text-stone-300' : 'text-gray-700'}>Are you sure you want to delete this job? This action cannot be undone.</p>
+              <div className="mt-6 flex justify-end gap-2">
+                <button
+                  onClick={() => setDeleteJobId(null)}
+                  className="px-4 py-2 rounded-lg border border-gray-300 bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  disabled={deleting}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDeleteJob(deleteJobId)}
+                  className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 font-bold"
+                  disabled={deleting}
+                >
+                  {deleting ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
             </div>
-          ))}
-        </div>
-      )}
-
-      {jobsApi.error && (
-        <div className={`${isDarkMode ? 'bg-red-900/50 border-red-700' : 'bg-red-50 border-red-200'} border rounded-lg p-4`}>
-          <p className={isDarkMode ? 'text-red-200' : 'text-red-800'}>
-            Error loading jobs: {jobsApi.error}
-          </p>
-          <button 
-            onClick={handleRefresh}
-            className="mt-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-          >
-            Retry
-          </button>
-        </div>
-      )}
-
-      {!jobsApi.loading && !jobsApi.error && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          {filteredJobs.map((job) => (
-            <JobCard 
-              key={job.id} 
-              job={job}
-              onAction={(action) => handleJobAction(job.id, action)}
-            />
-          ))}
-        </div>
-      )}
-
-      {!jobsApi.loading && !jobsApi.error && filteredJobs.length === 0 && (
-        <div className={`${isDarkMode ? 'bg-stone-800 border-stone-700' : 'bg-white border-gray-200'} p-12 rounded-lg border text-center`}>
-          <h3 className={`text-lg font-medium ${isDarkMode ? 'text-stone-100' : 'text-gray-900'} mb-2`}>No jobs found</h3>
-          <p className={`${isDarkMode ? 'text-stone-400' : 'text-gray-500'} mb-6`}>Try adjusting your filters or search terms.</p>
-          <button 
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors mx-auto"
-          >
-            <Plus className="w-4 h-4" />
-            Create New Job
-          </button>
-        </div>
-      )}
-
-      {/* Create Job Modal */}
-      {showCreateModal && (
-        <CreateJobModal 
-          onClose={() => setShowCreateModal(false)}
-          onSubmit={handleCreateJob}
-          loading={createJobApi.loading}
-          error={createJobApi.error}
-        />
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
