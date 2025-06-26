@@ -9,11 +9,27 @@ export const CrawlerControls: React.FC = () => {
   const { showNotification, isDarkMode } = useDashboard();
   const [status, setStatus] = useState<CrawlerStatus | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [uptime, setUptime] = useState<number>(0);
 
   useEffect(() => {
     fetchStatus();
-    const interval = setInterval(fetchStatus, 2000); // Update every 2 seconds
+    const interval = setInterval(fetchStatus, 3000); // Update every 3 seconds
     return () => clearInterval(interval);
+  }, []);
+
+  // Whenever status.uptime_seconds changes, reset local uptime
+  useEffect(() => {
+    if (status && typeof status.uptime_seconds === 'number') {
+      setUptime(status.uptime_seconds);
+    }
+  }, [status?.uptime_seconds]);
+
+  // Increment uptime every second
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setUptime((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
   }, []);
 
   const fetchStatus = async () => {
@@ -113,7 +129,7 @@ export const CrawlerControls: React.FC = () => {
             <span className={`text-sm font-medium ${isDarkMode ? 'text-stone-300' : 'text-gray-700'}`}>Uptime</span>
           </div>
           <p className={`text-lg font-semibold ${isDarkMode ? 'text-stone-100' : 'text-gray-900'}`}>
-            {status ? formatUptime(status.uptime_seconds) : '--'}
+            {typeof uptime === 'number' ? formatUptime(uptime) : '--'}
           </p>
         </div>
 
@@ -123,7 +139,7 @@ export const CrawlerControls: React.FC = () => {
             <span className={`text-sm font-medium ${isDarkMode ? 'text-stone-300' : 'text-gray-700'}`}>Pages/Second</span>
           </div>
           <p className={`text-lg font-semibold ${isDarkMode ? 'text-stone-100' : 'text-gray-900'}`}>
-            {status ? status.avg_pages_per_second.toFixed(2) : '0.00'}
+            {typeof status?.avg_pages_per_second === 'number' ? status.avg_pages_per_second.toFixed(2) : '0.00'}
           </p>
         </div>
       </div>
@@ -156,17 +172,6 @@ export const CrawlerControls: React.FC = () => {
           <RotateCcw className="w-4 h-4" />
           {actionLoading === 'reset' ? 'Resetting...' : 'Reset All'}
         </button>
-      </div>
-
-      {/* Emergency Stop */}
-      <div className={`${isDarkMode ? 'bg-red-900/50 border-red-700' : 'bg-red-50 border-red-200'} border rounded-lg p-4`}>
-        <div className="flex items-center gap-2 mb-2">
-          <AlertTriangle className="w-5 h-5 text-red-600" />
-          <span className={`text-sm font-medium ${isDarkMode ? 'text-red-200' : 'text-red-800'}`}>Emergency Stop</span>
-        </div>
-        <p className={`text-sm ${isDarkMode ? 'text-red-300' : 'text-red-700'} mb-3`}>
-          Use this to immediately stop all crawling activities and clear all queues.
-        </p>
         <button
           onClick={handleReset}
           disabled={actionLoading !== null}
@@ -175,6 +180,7 @@ export const CrawlerControls: React.FC = () => {
           <AlertTriangle className="w-4 h-4" />
           Emergency Stop & Reset
         </button>
+
       </div>
 
       {/* Progress Information */}
@@ -182,39 +188,34 @@ export const CrawlerControls: React.FC = () => {
         <div className="mt-6 space-y-3">
           <div className="flex justify-between text-sm">
             <span className={isDarkMode ? 'text-stone-400' : 'text-gray-600'}>Pages Crawled:</span>
-            <span className={`font-medium ${isDarkMode ? 'text-stone-200' : 'text-gray-900'}`}>{status.pages_crawled_total.toLocaleString()}</span>
+            <span className={`font-medium ${isDarkMode ? 'text-stone-200' : 'text-gray-900'}`}>{typeof status.pages_crawled_total === 'number' ? status.pages_crawled_total.toLocaleString() : '0'}</span>
           </div>
-          
           {typeof status.max_pages_configured === 'number' && status.max_pages_configured > 0 && (
             <div className="flex justify-between text-sm">
               <span className={isDarkMode ? 'text-stone-400' : 'text-gray-600'}>Progress:</span>
               <span className={`font-medium ${isDarkMode ? 'text-stone-200' : 'text-gray-900'}`}>
-                {Math.round((status.pages_crawled_total / status.max_pages_configured) * 100)}%
+                {Math.round((typeof status.pages_crawled_total === 'number' ? status.pages_crawled_total : 0 / status.max_pages_configured) * 100)}%
               </span>
             </div>
           )}
-
           <div className="flex justify-between text-sm">
             <span className={isDarkMode ? 'text-stone-400' : 'text-gray-600'}>Queue Size:</span>
-            <span className={`font-medium ${isDarkMode ? 'text-stone-200' : 'text-gray-900'}`}>{status.frontier_queue_size.toLocaleString()}</span>
+            <span className={`font-medium ${isDarkMode ? 'text-stone-200' : 'text-gray-900'}`}>{typeof status.frontier_queue_size === 'number' ? status.frontier_queue_size.toLocaleString() : '0'}</span>
           </div>
-
           <div className="flex justify-between text-sm">
             <span className={isDarkMode ? 'text-stone-400' : 'text-gray-600'}>Processing:</span>
-            <span className={`font-medium ${isDarkMode ? 'text-stone-200' : 'text-gray-900'}`}>{status.urls_in_processing.toLocaleString()}</span>
+            <span className={`font-medium ${isDarkMode ? 'text-stone-200' : 'text-gray-900'}`}>{typeof status.urls_in_processing === 'number' ? status.urls_in_processing.toLocaleString() : '0'}</span>
           </div>
-
           <div className="flex justify-between text-sm">
             <span className={isDarkMode ? 'text-stone-400' : 'text-gray-600'}>Completed:</span>
-            <span className={`font-medium ${isDarkMode ? 'text-stone-200' : 'text-gray-900'}`}>{status.urls_completed_redis.toLocaleString()}</span>
+            <span className={`font-medium ${isDarkMode ? 'text-stone-200' : 'text-gray-900'}`}>{typeof status.urls_completed_redis === 'number' ? status.urls_completed_redis.toLocaleString() : '0'}</span>
           </div>
-
           <div className="flex justify-between text-sm">
             <span className={isDarkMode ? 'text-stone-400' : 'text-gray-600'}>Errors:</span>
-            <span className={`font-medium ${isDarkMode ? 'text-stone-200' : 'text-gray-900'} text-red-600`}>{status.total_errors_count.toLocaleString()}</span>
+            <span className={`font-medium ${isDarkMode ? 'text-stone-200' : 'text-gray-900'} text-red-600`}>{typeof status.total_errors_count === 'number' ? status.total_errors_count.toLocaleString() : '0'}</span>
           </div>
         </div>
       )}
     </div>
   );
-}; 
+};
