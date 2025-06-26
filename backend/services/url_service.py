@@ -4,9 +4,9 @@ Provides business logic for URL management.
 """
 
 from typing import List, Dict, Any
-from ..core.logger import get_logger
-from ..exceptions import CrawlError
-from ..core.crawler.url_utils import normalize_url
+from core.logger import get_logger
+from exceptions import CrawlError
+from core.crawler.url_utils import normalize_url
 
 logger = get_logger("url_service")
 

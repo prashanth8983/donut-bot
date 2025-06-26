@@ -8,7 +8,7 @@ import time
 from typing import Dict, Optional
 from urllib.parse import urlparse
 
-from ..logger import get_logger
+from core.logger import get_logger
 
 logger = get_logger("crawler.rate_limiter")
 
@@ -43,7 +43,7 @@ class RateLimiter:
         last_request_time = self.last_request_times.get(domain, 0)
         
         time_since_last = current_time - last_request_time
-        if time_since_last < rate_limit:
+        if rate_limit is not None and time_since_last < rate_limit:
             wait_time = rate_limit - time_since_last
             logger.debug(f"Rate limiting: waiting {wait_time:.2f}s for domain {domain}")
             await asyncio.sleep(wait_time)
@@ -72,7 +72,7 @@ class RateLimiter:
         Returns:
             Rate limit in seconds
         """
-        return self.domain_rates.get(domain, self.config.default_delay)
+        return self.domain_rates.get(domain, self.config.default_delay) or 0.0
     
     def reset_domain(self, domain: str):
         """

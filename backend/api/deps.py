@@ -6,9 +6,9 @@ Provides dependency injection for services and database connections.
 from typing import Generator
 from fastapi import Depends
 
-from ..db.database import Database, get_database
-from ..services.job_service import JobService
-from ..services.crawler_service import CrawlerService
+from db.database import Database, get_database
+from services.job_service import JobService
+from services.crawler_service import crawler_service
 
 
 async def get_job_service(db: Database = Depends(get_database)) -> JobService:
@@ -16,6 +16,6 @@ async def get_job_service(db: Database = Depends(get_database)) -> JobService:
     return JobService(db)
 
 
-async def get_crawler_service() -> CrawlerService:
+async def get_crawler_service():
     """Dependency to get crawler service instance."""
-    return CrawlerService() 
+    return crawler_service 

@@ -6,12 +6,13 @@ Handles HTTP requests for job management operations.
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 
-from ....db.schemas import JobCreate, JobUpdate, JobResponse, JobListResponse, JobStats
-from ....services.job_service import JobService
-from ....exceptions import JobNotFoundError, JobAlreadyExistsError, InvalidJobStateError, DatabaseError
-from ....core.logger import get_logger
-from ...deps import get_job_service
+from db.schemas import JobCreate, JobUpdate, JobResponse, JobListResponse, JobStats
+from services.job_service import JobService
+from exceptions import JobNotFoundError, JobAlreadyExistsError, InvalidJobStateError, DatabaseError
+from core.logger import get_logger
+from api.deps import get_job_service
 
 logger = get_logger("jobs_api")
 router = APIRouter()
@@ -53,7 +54,7 @@ async def get_jobs(
 ):
     """Get jobs with optional filtering and pagination."""
     try:
-        jobs = await job_service.get_jobs(
+        jobs_response = await job_service.get_jobs(
             status=job_status,
             priority=priority,
             domain=domain,
@@ -61,7 +62,12 @@ async def get_jobs(
             page=page,
             size=size
         )
-        return jobs
+        # Debug: print type and content of each job
+        for job in jobs_response.jobs:
+            print(f"DEBUG JOB TYPE: {type(job)} CONTENT: {job}")
+        response_dict = jobs_response.model_dump()
+        response_dict["jobs"] = [job.model_dump(by_alias=True) for job in jobs_response.jobs]
+        return JSONResponse(content=jsonable_encoder(response_dict))
     except DatabaseError as e:
         logger.error(f"Database error getting jobs: {e}")
         raise HTTPException(
@@ -74,6 +80,19 @@ async def get_jobs(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
         )
+
+
+@router.get("/", include_in_schema=False)
+async def get_jobs_slash(
+    job_status: Optional[str] = Query(None, description="Filter by job status"),
+    priority: Optional[str] = Query(None, description="Filter by priority"),
+    domain: Optional[str] = Query(None, description="Filter by domain"),
+    scheduled: Optional[bool] = Query(None, description="Filter by scheduled status"),
+    page: int = Query(1, ge=1, description="Page number"),
+    size: int = Query(100, ge=1, le=1000, description="Page size"),
+    job_service: JobService = Depends(get_job_service)
+):
+    return await get_jobs(job_status, priority, domain, scheduled, page, size, job_service)
 
 
 @router.get("/{job_id}", response_model=JobResponse)
@@ -220,6 +239,39 @@ async def stop_job(
         )
 
 
+@router.post("/{job_id}/resume", status_code=status.HTTP_200_OK)
+async def resume_job(
+    job_id: str,
+    job_service: JobService = Depends(get_job_service)
+):
+    """Resume a job."""
+    try:
+        success = await job_service.resume_job(job_id)
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Job not found: {job_id}"
+            )
+        logger.info(f"Resumed job: {job_id}")
+        return {"message": "Job resumed successfully"}
+    except JobNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Job not found: {job_id}"
+        )
+    except InvalidJobStateError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Error resuming job {job_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+
+
 @router.get("/stats/overview", response_model=JobStats)
 async def get_job_stats(
     job_service: JobService = Depends(get_job_service)
@@ -233,4 +285,9 @@ async def get_job_stats(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
-        ) 
+        )
+
+
+@router.get("/stats/overview/", include_in_schema=False)
+async def get_job_stats_slash(job_service: JobService = Depends(get_job_service)):
+    return await get_job_stats(job_service) 

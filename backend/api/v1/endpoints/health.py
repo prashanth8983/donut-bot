@@ -10,8 +10,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from ....db.database import Database, get_database
-from ....core.logger import get_logger
+from db.database import Database, get_database
+from core.logger import get_logger
 
 logger = get_logger("health_api")
 router = APIRouter()
@@ -139,6 +139,11 @@ async def health_check():
         service="donut-bot-api",
         timestamp=get_current_timestamp()
     )
+
+
+@router.get("/health", response_model=HealthResponse, include_in_schema=False)
+async def health_check_no_slash():
+    return await health_check()
 
 
 @router.get("/detailed", response_model=DetailedHealthResponse)

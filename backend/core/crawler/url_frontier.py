@@ -9,8 +9,9 @@ import time
 from typing import Optional, Dict, Any
 from redis.asyncio import Redis
 from urllib.parse import urlparse
+import inspect
 
-from ..logger import get_logger
+from core.logger import get_logger
 from .url_utils import normalize_url
 
 logger = get_logger("crawler.url_frontier")
@@ -55,23 +56,19 @@ class URLFrontier:
         """Add a URL to the frontier queue."""
         if not self.redis:
             await self.initialize()
-        
         norm_url = normalize_url(url)
         if not norm_url:
             logger.warning(f"URL Frontier: Invalid URL: {url}")
             return False
-        
         try:
             # Check if URL is already completed
-            if await self.redis.sismember(self.completed_urls, norm_url):
+            if self.redis and await self.redis.sismember(self.completed_urls, norm_url):
                 logger.debug(f"URL Frontier: URL already completed: {norm_url}")
                 return False
-            
             # Try to add to seen URLs set
-            if not await self.redis.sadd(self.seen_urls, norm_url):
+            if self.redis and not await self.redis.sadd(self.seen_urls, norm_url):
                 logger.debug(f"URL Frontier: URL already seen: {norm_url}")
                 return False
-            
             # Create URL data
             data = {
                 'url': norm_url,
@@ -81,14 +78,12 @@ class URLFrontier:
                 'added_at': time.time(),
                 'domain': urlparse(norm_url).netloc
             }
-            
             # Calculate score for priority queue (negative priority for min-heap behavior)
             score = -priority + (data['added_at'] / 1_000_000_000)
-            await self.redis.zadd(self.queue_key, {json.dumps(data): score})
-            
+            if self.redis:
+                await self.redis.zadd(self.queue_key, {json.dumps(data): score})
             logger.debug(f"URL Frontier: Added URL to queue: {norm_url} (priority: {priority}, depth: {depth})")
             return True
-            
         except Exception as e:
             logger.error(f"URL Frontier: Error adding URL {url}: {e}")
             return False
@@ -100,7 +95,10 @@ class URLFrontier:
         
         try:
             # Get URL with highest priority (lowest score)
-            results = await self.redis.zpopmin(self.queue_key, count=1)
+            if self.redis:
+                queue_size = await self.redis.zcard(self.queue_key)
+                logger.debug(f"URL Frontier: Queue size before get_url: {queue_size}")
+            results = await self.redis.zpopmin(self.queue_key, count=1) if self.redis else None
             if not results:
                 return None
             
@@ -109,7 +107,7 @@ class URLFrontier:
             norm_url = data['url']
             
             # Mark URL as processing
-            if await self.redis.sadd(self.processing_urls, norm_url):
+            if self.redis and await self.redis.sadd(self.processing_urls, norm_url):
                 logger.debug(f"URL Frontier: Processing URL: {norm_url}")
                 return data
             else:
@@ -127,20 +125,22 @@ class URLFrontier:
             await self.initialize()
         
         try:
-            await self.redis.srem(self.processing_urls, norm_url)
-            await self.redis.sadd(self.completed_urls, norm_url)
+            if self.redis:
+                await self.redis.srem(self.processing_urls, norm_url)
+                await self.redis.sadd(self.completed_urls, norm_url)
             logger.debug(f"URL Frontier: Marked URL as completed: {norm_url}")
         except Exception as e:
             logger.error(f"URL Frontier: Error marking URL as completed {norm_url}: {e}")
 
-    async def mark_failed(self, norm_url: str, depth: int, original_url: str = None, retry_policy: Dict = None):
+    async def mark_failed(self, norm_url: str, depth: int, original_url: Optional[str] = None, retry_policy: Optional[Dict] = None):
         """Mark a URL as failed."""
         if not self.redis:
             await self.initialize()
         
         try:
-            await self.redis.srem(self.processing_urls, norm_url)
-            logger.debug(f"URL Frontier: Marked URL as failed: {norm_url}")
+            if self.redis:
+                await self.redis.srem(self.processing_urls, norm_url)
+                logger.debug(f"URL Frontier: Marked URL as failed: {norm_url}")
         except Exception as e:
             logger.error(f"URL Frontier: Error marking URL as failed {norm_url}: {e}")
 
@@ -150,7 +150,14 @@ class URLFrontier:
             await self.initialize()
         
         try:
-            return await self.redis.sismember(self.completed_urls, normalize_url(url))
+            if self.redis:
+                normalized_url = normalize_url(url)
+                if normalized_url:
+                    return bool(await self.redis.sismember(self.completed_urls, normalized_url))
+                else:
+                    return False
+            else:
+                return False
         except Exception as e:
             logger.error(f"URL Frontier: Error checking URL completion {url}: {e}")
             return False
@@ -161,7 +168,10 @@ class URLFrontier:
             await self.initialize()
         
         try:
-            return await self.redis.zcard(self.queue_key)
+            if self.redis:
+                return await self.redis.zcard(self.queue_key)
+            else:
+                return 0
         except Exception as e:
             logger.error(f"URL Frontier: Error getting queue size: {e}")
             return 0
@@ -172,7 +182,13 @@ class URLFrontier:
             await self.initialize()
         
         try:
-            return await self.redis.scard(self.processing_urls)
+            if self.redis:
+                result = self.redis.scard(self.processing_urls)
+                if inspect.isawaitable(result):
+                    result = await result
+                return result
+            else:
+                return 0
         except Exception as e:
             logger.error(f"URL Frontier: Error getting processing count: {e}")
             return 0
@@ -183,7 +199,13 @@ class URLFrontier:
             await self.initialize()
         
         try:
-            return await self.redis.scard(self.completed_urls)
+            if self.redis:
+                result = self.redis.scard(self.completed_urls)
+                if inspect.isawaitable(result):
+                    result = await result
+                return result
+            else:
+                return 0
         except Exception as e:
             logger.error(f"URL Frontier: Error getting completed count: {e}")
             return 0
@@ -194,7 +216,13 @@ class URLFrontier:
             await self.initialize()
         
         try:
-            return await self.redis.scard(self.seen_urls)
+            if self.redis:
+                result = self.redis.scard(self.seen_urls)
+                if inspect.isawaitable(result):
+                    result = await result
+                return result
+            else:
+                return 0
         except Exception as e:
             logger.error(f"URL Frontier: Error getting seen count: {e}")
             return 0
@@ -206,7 +234,8 @@ class URLFrontier:
         
         keys = [self.queue_key, self.seen_urls, self.processing_urls, self.completed_urls]
         try:
-            await self.redis.delete(*keys)
+            if self.redis:
+                await self.redis.delete(*keys)
             logger.info("URL Frontier: Cleared all frontier data")
         except Exception as e:
             logger.error(f"URL Frontier: Error clearing frontier data: {e}")
@@ -222,10 +251,16 @@ class URLFrontier:
         
         async def count(key: str, type_: str) -> int:
             try:
-                if type_ == 'set':
-                    return await self.redis.scard(key)
+                if self.redis:
+                    if type_ == 'set':
+                        result = self.redis.scard(key)
+                        if inspect.isawaitable(result):
+                            result = await result
+                        return result
+                    else:
+                        return await self.redis.zcard(key)
                 else:
-                    return await self.redis.zcard(key)
+                    return 0
             except Exception:
                 return 0
         
@@ -248,7 +283,7 @@ class URLFrontier:
         deleted = 0
         if keys:
             try:
-                deleted = await self.redis.delete(*keys)
+                deleted = await self.redis.delete(*keys) if self.redis else 0
                 logger.info(f"URL Frontier: Cleared {deleted} keys: {keys}")
             except Exception as e:
                 logger.error(f"URL Frontier: Error clearing specific data: {e}")

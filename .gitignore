@@ -401,7 +401,7 @@ venv/
 *.msix
 *.msm
 *.msp
-
+crawler_output/
 # JetBrains Rider
 *.sln.iml
 

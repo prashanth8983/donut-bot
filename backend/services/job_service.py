@@ -7,11 +7,11 @@ from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 from bson import ObjectId
 
-from ..db.database import Database
-from ..db.schemas import JobCreate, JobUpdate, JobResponse, JobListResponse, JobStats
-from ..exceptions import JobNotFoundError, JobAlreadyExistsError, InvalidJobStateError, DatabaseError
-from ..core.logger import get_logger
-from ..core.utils import convert_datetimes
+from db.database import Database
+from db.schemas import JobCreate, JobUpdate, JobResponse, JobListResponse, JobStats
+from exceptions import JobNotFoundError, JobAlreadyExistsError, InvalidJobStateError, DatabaseError
+from core.logger import get_logger
+from core.utils import convert_datetimes
 
 logger = get_logger("job_service")
 
@@ -83,8 +83,10 @@ class JobService:
             
             doc = await self.collection.find_one({"_id": ObjectId(job_id)})
             if doc:
-                # Keep _id for PyObjectId alias, but ensure it's a string
-                doc["_id"] = str(doc["_id"])
+                # Convert _id to id for the Pydantic model
+                doc["id"] = str(doc["_id"])
+                # Remove the original _id to avoid conflicts
+                del doc["_id"]
                 # Ensure all required fields are present with defaults
                 doc.setdefault("name", "Unknown Job")
                 doc.setdefault("domain", "https://example.com")
@@ -152,8 +154,10 @@ class JobService:
                 try:
                     # Convert _id to id field for PyObjectId alias
                     if "_id" in doc and doc["_id"] is not None:
-                        # Keep _id for PyObjectId alias, but ensure it's a string
-                        doc["_id"] = str(doc["_id"])
+                        # Convert _id to id for the Pydantic model
+                        doc["id"] = str(doc["_id"])
+                        # Remove the original _id to avoid conflicts
+                        del doc["_id"]
                         # Ensure all required fields are present with defaults
                         doc.setdefault("name", "Unknown Job")
                         doc.setdefault("domain", "https://example.com")
@@ -339,6 +343,47 @@ class JobService:
         except Exception as e:
             logger.error(f"Failed to stop job {job_id}: {e}")
             raise DatabaseError(f"Failed to stop job: {str(e)}")
+    
+    async def resume_job(self, job_id: str) -> bool:
+        """Resume a paused job."""
+        try:
+            job = await self.get_job_by_id(job_id)
+            if not job:
+                raise JobNotFoundError(f"Job not found: {job_id}")
+            
+            # Check valid state transitions
+            if job.status == "running":
+                raise InvalidJobStateError(f"Job is already running")
+            elif job.status == "completed":
+                raise InvalidJobStateError(f"Cannot resume a completed job")
+            elif job.status != "paused":
+                raise InvalidJobStateError(f"Job is not paused (current status: {job.status})")
+            
+            # Update job status
+            now = datetime.now(timezone.utc)
+            update_data = {
+                "status": "running",
+                "start_time": now,
+                "updated_at": now
+            }
+            
+            result = await self.collection.update_one(
+                {"_id": ObjectId(job_id)},
+                {"$set": update_data}
+            )
+            
+            if result.modified_count > 0:
+                logger.info(f"Resumed job: {job.name} (ID: {job_id})")
+                return True
+            
+            logger.warning(f"Failed to update job status for {job_id}")
+            return False
+            
+        except (JobNotFoundError, InvalidJobStateError):
+            raise
+        except Exception as e:
+            logger.error(f"Failed to resume job {job_id}: {e}")
+            raise DatabaseError(f"Failed to resume job: {str(e)}")
     
     async def get_job_stats(self) -> JobStats:
         """Get job statistics."""

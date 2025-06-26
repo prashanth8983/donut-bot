@@ -6,9 +6,9 @@ Uses motor for async MongoDB operations.
 from typing import Optional
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
-from ..config import settings
-from ..core.logger import get_logger
-from ..exceptions import DatabaseError
+from config import settings
+from core.logger import get_logger
+from exceptions import DatabaseError
 
 logger = get_logger("database")
 

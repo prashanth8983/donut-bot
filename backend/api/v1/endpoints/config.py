@@ -7,10 +7,10 @@ from typing import List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, validator
 
-from ....services.config_service import get_config_service, ConfigService
-from ....db.schemas import CrawlerConfigModel
-from ....exceptions import ConfigurationError
-from ....core.logger import get_logger
+from services.config_service import get_config_service, ConfigService
+from db.schemas import CrawlerConfigModel
+from exceptions import ConfigurationError
+from core.logger import get_logger
 
 logger = get_logger("config_api")
 router = APIRouter()
@@ -116,4 +116,14 @@ async def update_allowed_domains(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
-        ) 
+        )
+
+
+@router.get("", include_in_schema=False)
+async def get_configuration_no_slash(config_service: ConfigService = Depends(get_config_service)):
+    return await get_configuration(config_service)
+
+
+@router.get("/domains/", include_in_schema=False)
+async def get_allowed_domains_slash(config_service: ConfigService = Depends(get_config_service)):
+    return await get_allowed_domains(config_service) 

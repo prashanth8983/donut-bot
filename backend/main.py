@@ -10,15 +10,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import uvicorn
 
-from .config import settings
-from .core.logger import get_logger
-from .db.database import database
-from .services.crawler_service import crawler_service
-from .services.scheduler_service import get_scheduler_service, close_scheduler_service
-from .services.kafka_service import close_kafka_service
-from .services.file_storage_service import close_file_storage_service
-from .core.crawler.config import CrawlerConfig
-from .api.v1.router import api_router
+from config import settings
+from core.logger import get_logger
+from db.database import database
+from services.crawler_service import crawler_service
+from services.scheduler_service import get_scheduler_service, close_scheduler_service
+from services.kafka_service import close_kafka_service
+from services.file_storage_service import close_file_storage_service
+from core.crawler.config import CrawlerConfig
+from api.v1.router import api_router
 
 logger = get_logger("main")
 
@@ -55,7 +55,8 @@ async def lifespan(app: FastAPI):
                 local_output_dir=settings.local_output_dir
             )
             await crawler_service.initialize(crawler_config)
-            logger.info("Crawler service initialized successfully")
+            # Don't automatically start the crawler - it should only start when a job is created
+            logger.info("Crawler service initialized successfully (not started automatically)")
         except Exception as e:
             logger.warning(f"Crawler service initialization failed (continuing without crawler): {e}")
         
@@ -147,60 +148,10 @@ app.add_middleware(
 app.include_router(api_router, prefix="/api/v1")
 
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize application on startup."""
-    logger.info("Starting Donut Bot API...")
-    
-    # Initialize database
-    await database.connect()
-    logger.info("Database initialized")
-    
-    # Initialize crawler service
-    crawler_config = CrawlerConfig(
-        redis_host=settings.redis_host,
-        redis_port=settings.redis_port,
-        redis_db=settings.redis_db,
-        workers=settings.default_workers,
-        max_depth=settings.default_max_depth,
-        max_pages=settings.default_max_pages,
-        default_delay=settings.default_delay,
-        allowed_domains=settings.default_allowed_domains,
-        kafka_brokers=settings.kafka_brokers,
-        output_topic=settings.kafka_topic,
-        enable_kafka_output=settings.enable_kafka_output,
-        enable_local_save=settings.enable_local_save,
-        local_output_dir=settings.local_output_dir
-    )
-    await crawler_service.initialize(crawler_config)
-    logger.info("Crawler service initialized")
-    
-    # Initialize scheduler service
-    await get_scheduler_service()
-    logger.info("Scheduler service initialized")
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on application shutdown."""
-    logger.info("Shutting down Donut Bot API...")
-    
-    # Stop crawler if running
-    if crawler_service.crawler_engine and crawler_service.crawler_engine.running:
-        await crawler_service.stop_crawler()
-        logger.info("Crawler stopped")
-    
-    # Close scheduler service
-    await close_scheduler_service()
-    logger.info("Scheduler service closed")
-    
-    logger.info("Shutdown complete")
-
-
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """Global exception handler."""
-    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    logger.error(f"Unhandled exception: {exc}")
     return JSONResponse(
         status_code=500,
         content={"detail": "Internal server error"}
@@ -221,8 +172,8 @@ async def root():
 if __name__ == "__main__":
     uvicorn.run(
         "main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True,
+        host=settings.host,
+        port=settings.port,
+        reload=settings.debug,
         log_level="info"
     ) 

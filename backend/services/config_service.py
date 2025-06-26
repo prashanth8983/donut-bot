@@ -4,9 +4,9 @@ Provides business logic for configuration operations.
 """
 
 from typing import List, Dict, Any
-from ..core.logger import get_logger
-from ..exceptions import ConfigurationError
-from ..db.schemas import CrawlerConfigModel
+from core.logger import get_logger
+from exceptions import ConfigurationError
+from db.schemas import CrawlerConfigModel
 
 logger = get_logger("config_service")
 

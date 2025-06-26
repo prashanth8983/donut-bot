@@ -7,13 +7,13 @@ from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 
-from ....db.schemas import CrawlerConfigModel
-from ....services.crawler_service import CrawlerService
-from ....services.kafka_service import get_kafka_service
-from ....services.file_storage_service import get_file_storage_service
-from ....exceptions import ServiceError, ConfigurationError
-from ....core.logger import get_logger
-from ...deps import get_crawler_service
+from db.schemas import CrawlerConfigModel
+from services.crawler_service import CrawlerService
+from services.kafka_service import get_kafka_service
+from services.file_storage_service import get_file_storage_service
+from exceptions import ServiceError, ConfigurationError
+from core.logger import get_logger
+from api.deps import get_crawler_service
 
 logger = get_logger("crawler_api")
 router = APIRouter()
@@ -33,13 +33,24 @@ async def get_crawler_status(crawler_service: CrawlerService = Depends(get_crawl
         )
 
 
+@router.get("/status/", include_in_schema=False)
+async def get_crawler_status_slash(crawler_service: CrawlerService = Depends(get_crawler_service)):
+    return await get_crawler_status(crawler_service)
+
+
 @router.post("/start")
-async def start_crawler(crawler_service: CrawlerService = Depends(get_crawler_service)):
+async def start_crawler(
+    job_id: Optional[str] = None,
+    crawler_service: CrawlerService = Depends(get_crawler_service)
+):
     """Start the crawler."""
     try:
-        success = await crawler_service.start_crawler()
+        success = await crawler_service.start_crawler(job_id=job_id)
         if success:
-            return {"message": "Crawler started successfully"}
+            message = "Crawler started successfully"
+            if job_id:
+                message += f" with job tracking for job {job_id}"
+            return {"message": message}
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -94,12 +105,18 @@ async def pause_crawler(crawler_service: CrawlerService = Depends(get_crawler_se
 
 
 @router.post("/resume")
-async def resume_crawler(crawler_service: CrawlerService = Depends(get_crawler_service)):
+async def resume_crawler(
+    job_id: Optional[str] = None,
+    crawler_service: CrawlerService = Depends(get_crawler_service)
+):
     """Resume the crawler."""
     try:
-        success = await crawler_service.start_crawler()
+        success = await crawler_service.start_crawler(job_id=job_id)
         if success:
-            return {"message": "Crawler resumed successfully"}
+            message = "Crawler resumed successfully"
+            if job_id:
+                message += f" with job tracking for job {job_id}"
+            return {"message": message}
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -185,6 +202,11 @@ async def get_allowed_domains(crawler_service: CrawlerService = Depends(get_craw
         )
 
 
+@router.get("/allowed_domains/", include_in_schema=False)
+async def get_allowed_domains_slash(crawler_service: CrawlerService = Depends(get_crawler_service)):
+    return await get_allowed_domains(crawler_service)
+
+
 @router.post("/allowed_domains")
 async def update_allowed_domains(
     action: str,
@@ -238,6 +260,11 @@ async def get_kafka_status():
         )
 
 
+@router.get("/kafka/status/", include_in_schema=False)
+async def get_kafka_status_slash():
+    return await get_kafka_status()
+
+
 @router.get("/storage/status")
 async def get_storage_status():
     """Get file storage service status."""
@@ -251,6 +278,11 @@ async def get_storage_status():
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get storage status"
         )
+
+
+@router.get("/storage/status/", include_in_schema=False)
+async def get_storage_status_slash():
+    return await get_storage_status()
 
 
 @router.post("/storage/cleanup")

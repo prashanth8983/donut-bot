@@ -11,11 +11,12 @@ from croniter import croniter
 from pymongo import ASCENDING
 from bson import ObjectId
 
-from ..db.database import Database, get_database
-from ..db.schemas import ScheduledJobCreate, ScheduledJobUpdate, ScheduledJobResponse, ScheduledJobListResponse
-from ..core.logger import get_logger
-from ..exceptions import DatabaseError, JobNotFoundError, InvalidJobStateError
-from .job_service import JobService
+from db.database import Database, get_database
+from db.schemas import ScheduledJobCreate, ScheduledJobUpdate, ScheduledJobResponse, ScheduledJobListResponse
+from core.logger import get_logger
+from exceptions import DatabaseError, JobNotFoundError
+from services.job_service import JobService
+from db.schemas import JobCreate
 
 logger = get_logger("scheduler_service")
 
@@ -376,7 +377,6 @@ class SchedulerService:
             )
             
             # Create a crawl job from the scheduled job
-            from ..db.schemas import JobCreate
             
             job_create = JobCreate(
                 name=f"Scheduled: {job_doc['name']}",

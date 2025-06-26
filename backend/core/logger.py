@@ -7,7 +7,7 @@ import logging
 import sys
 from typing import Any, Dict
 
-from ..config import settings
+from config import settings
 
 
 def setup_logger(name: str = "donut-bot") -> logging.Logger:

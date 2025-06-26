@@ -72,7 +72,7 @@ class ApiService {
   }
 
   async getCrawlerStatus(): Promise<ApiResponse<CrawlerStatus>> {
-    return this.request<CrawlerStatus>('/api/v1/crawler/status');
+    return this.request<CrawlerStatus>('/api/v1/crawler/status/');
   }
 
   async resetCrawler(options?: {
@@ -97,7 +97,7 @@ class ApiService {
   }
 
   async getQueueStatus(): Promise<ApiResponse<QueueStatus>> {
-    return this.request<QueueStatus>('/api/v1/urls/queue');
+    return this.request<QueueStatus>('/api/v1/urls/queue/');
   }
 
   async clearUrls(): Promise<ApiResponse> {
@@ -108,7 +108,7 @@ class ApiService {
 
   // Configuration Management
   async getConfig(): Promise<ApiResponse<CrawlerConfig>> {
-    return this.request<CrawlerConfig>('/api/v1/config');
+    return this.request<CrawlerConfig>('/api/v1/config/');
   }
 
   async updateConfig(config: Partial<CrawlerConfig>): Promise<ApiResponse> {
@@ -119,7 +119,7 @@ class ApiService {
   }
 
   async getAllowedDomains(): Promise<ApiResponse<AllowedDomainsResponse>> {
-    return this.request<AllowedDomainsResponse>('/api/v1/config/domains');
+    return this.request<AllowedDomainsResponse>('/api/v1/config/domains/');
   }
 
   async updateAllowedDomains(
@@ -134,7 +134,7 @@ class ApiService {
 
   // Metrics and Statistics
   async getMetrics(): Promise<ApiResponse<Metrics>> {
-    return this.request<Metrics>('/api/v1/metrics');
+    return this.request<Metrics>('/api/v1/metrics/');
   }
 
   async getStats(): Promise<ApiResponse<any>> {
@@ -142,7 +142,7 @@ class ApiService {
   }
 
   async healthCheck(): Promise<ApiResponse<{ status: string }>> {
-    return this.request<{ status: string }>('/api/v1/health');
+    return this.request<{ status: string }>('/api/v1/health/');
   }
 
   // Results and Data
@@ -169,7 +169,7 @@ class ApiService {
   }
 
   async getJobs(): Promise<ApiResponse<JobsResponse>> {
-    return this.request<JobsResponse>('/api/v1/jobs');
+    return this.request<JobsResponse>('/api/v1/jobs/');
   }
 
   async getJob(id: string): Promise<ApiResponse<CrawlJob>> {
@@ -251,7 +251,7 @@ class ApiService {
   }
 
   async getNextRuns(): Promise<ApiResponse<NextRunsResponse>> {
-    return this.request<NextRunsResponse>('/api/v1/scheduler/next-runs');
+    return this.request<NextRunsResponse>('/api/v1/scheduler/next-runs/');
   }
 }
 

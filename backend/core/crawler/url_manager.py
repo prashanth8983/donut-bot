@@ -4,7 +4,7 @@ Handles the URL frontier, deduplication, and visited tracking.
 """
 
 from typing import Set, List
-from ..logger import get_logger
+from core.logger import get_logger
 
 logger = get_logger("crawler.url_manager")
 
@@ -24,7 +24,7 @@ class URLManager:
             self.visited.add(url)
             logger.debug(f"Processing URL: {url}")
             return url
-        return None
+        return ""
 
     def has_pending(self) -> bool:
         return bool(self.frontier) 

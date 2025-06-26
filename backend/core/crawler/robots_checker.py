@@ -9,7 +9,7 @@ from typing import Dict, Set, Optional
 from urllib.parse import urljoin, urlparse
 import time
 
-from ..logger import get_logger
+from core.logger import get_logger
 
 logger = get_logger("crawler.robots_checker")
 
@@ -82,7 +82,8 @@ class RobotsChecker:
         """Fetch and parse robots.txt file."""
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(robots_url, timeout=10) as response:
+                timeout = aiohttp.ClientTimeout(total=10)
+                async with session.get(robots_url, timeout=timeout) as response:
                     if response.status != 200:
                         return {'user_agents': {}, 'sitemaps': []}
                     

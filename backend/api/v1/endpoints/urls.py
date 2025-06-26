@@ -7,9 +7,9 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
-from ....services.url_service import get_url_service, URLService
-from ....exceptions import CrawlError
-from ....core.logger import get_logger
+from services.url_service import get_url_service, URLService
+from exceptions import CrawlError
+from core.logger import get_logger
 
 logger = get_logger("urls_api")
 router = APIRouter()
@@ -89,4 +89,14 @@ async def get_urls(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
-        ) 
+        )
+
+
+@router.get("/queue/", include_in_schema=False)
+async def get_url_queue_status_slash(url_service: URLService = Depends(get_url_service)):
+    return await get_url_queue_status(url_service)
+
+
+@router.get("/urls/", include_in_schema=False)
+async def get_urls_slash(url_service: URLService = Depends(get_url_service)):
+    return await get_urls(url_service) 

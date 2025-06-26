@@ -155,7 +155,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onAction }) => {
         </div>
 
         <div className={`text-xs ${isDarkMode ? 'text-stone-500' : 'text-gray-500'}`}>
-          Started: {new Date(job.startTime).toLocaleString()}
+          Started: {job.startTime ? new Date(job.startTime).toLocaleString() : '-'}
         </div>
       </div>
     </div>

@@ -56,7 +56,7 @@ def safe_get(dictionary: Dict[str, Any], key: str, default: Any = None) -> Any:
     return dictionary.get(key, default)
 
 
-def format_bytes(bytes_value: int) -> str:
+def format_bytes(bytes_value: float) -> str:
     """Format bytes to human readable format."""
     for unit in ['B', 'KB', 'MB', 'GB']:
         if bytes_value < 1024.0:

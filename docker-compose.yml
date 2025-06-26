@@ -127,7 +127,7 @@ services:
       # API Configuration
       API_HOST: 0.0.0.0
       API_PORT: 8089
-      LOG_LEVEL: INFO
+      LOG_LEVEL: DEBUG
       
       # Redis Configuration
       REDIS_HOST: redis
@@ -138,32 +138,32 @@ services:
       # Kafka Configuration
       KAFKA_BROKERS: kafka:29092
       OUTPUT_TOPIC: raw-documents
-      ENABLE_KAFKA_OUTPUT: "true"
-      ENABLE_LOCAL_SAVE: "false"
+      ENABLE_KAFKA_OUTPUT: "false"
+      ENABLE_LOCAL_SAVE: "true"
       
       # Crawler Configuration
       WORKERS: 3
       MAX_DEPTH: 3
-      MAX_PAGES: 1000
-      DEFAULT_DELAY: 1.0
+      MAX_PAGES: 4000
+      DEFAULT_DELAY: 2.0
       RESPECT_ROBOTS_TXT: "true"
       ALLOW_REDIRECTS: "true"
       
       # Allowed domains (comma-separated)
-      ALLOWED_DOMAINS: "example.com,test.com,demo.org"
+      ALLOWED_DOMAINS: "northeastern.edu,nyu.edu,stanford.edu,mit.edu"
       
       # Python configuration
       PYTHONUNBUFFERED: 1
       
       # MongoDB Configuration
       MONGO_URI: mongodb://admin:password123@mongodb:27017/webcrawler?authSource=admin
+      LOCAL_OUTPUT_DIR: /app/crawler_output
     volumes:
       - ./logs:/app/logs
-      - ./output:/app/crawler_output
+      - ./crawler_output:/app/crawler_output
     networks:
       - donut-bot-network
     restart: unless-stopped
-    command: python api_crawler.py
 
   # Frontend React App
   frontend:
@@ -171,12 +171,12 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        - VITE_API_URL=http://localhost:8089
+        - VITE_API_URL=http://webcrawler-api:8089
     container_name: webcrawler-frontend
     ports:
-      - "3000:80"
+      - "3000:3000"
     environment:
-      - VITE_API_URL=http://localhost:8089
+      - VITE_API_URL=http://webcrawler-api:8089
     depends_on:
       - webcrawler-api
     restart: unless-stopped

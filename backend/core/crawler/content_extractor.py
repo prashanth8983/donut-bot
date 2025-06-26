@@ -5,10 +5,10 @@ Extracts text content and links from HTML pages.
 
 import re
 from typing import Dict, Any, List, Optional
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 from urllib.parse import urljoin, urlparse
 
-from ..logger import get_logger
+from core.logger import get_logger
 
 logger = get_logger("crawler.content_extractor")
 
@@ -153,12 +153,12 @@ class ContentExtractor:
         
         # Extract language
         html_tag = soup.find('html')
-        if html_tag:
-            metadata['language'] = html_tag.get('lang', '')
+        if html_tag and isinstance(html_tag, Tag):
+            metadata['language'] = str(html_tag.get('lang', ''))
         
         # Extract canonical URL
         canonical = soup.find('link', rel='canonical')
-        if canonical:
-            metadata['canonical'] = canonical.get('href', '')
+        if canonical and isinstance(canonical, Tag):
+            metadata['canonical'] = str(canonical.get('href', ''))
         
         return metadata 

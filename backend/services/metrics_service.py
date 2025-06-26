@@ -5,7 +5,7 @@ Provides business logic for metrics and statistics.
 
 from typing import Dict, Any
 from datetime import datetime, timezone
-from ..core.logger import get_logger
+from core.logger import get_logger
 
 logger = get_logger("metrics_service")
 

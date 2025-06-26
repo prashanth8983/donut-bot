@@ -15,7 +15,7 @@ import ssl
 import hashlib
 from pathlib import Path
 
-from ..logger import get_logger
+from core.logger import get_logger
 from .config import CrawlerConfig
 from .url_frontier import URLFrontier
 from .url_utils import normalize_url, get_domain, resolve_relative_url
@@ -24,7 +24,7 @@ from .content_extractor import ContentExtractor
 from .robots_checker import RobotsChecker
 from .rate_limiter import RateLimiter
 from .bloom_filter import BloomFilter
-from ...exceptions import CrawlError, RobotsError, RateLimitError
+from exceptions import CrawlError, RobotsError, RateLimitError
 
 logger = get_logger("crawler.engine")
 
@@ -117,7 +117,7 @@ class CrawlerEngine:
             
             # Close Kafka producer
             if self.kafka_producer:
-                await self.kafka_producer.stop()
+                self.kafka_producer.stop()
             
             logger.info("Crawler engine closed successfully")
             
@@ -128,6 +128,7 @@ class CrawlerEngine:
         """Load seed URLs from configuration."""
         try:
             seed_urls = self.config.seed_urls.copy()
+            logger.debug(f"Seed URLs to add: {seed_urls}")
             
             # Load from file if specified
             if self.config.seed_urls_file and Path(self.config.seed_urls_file).exists():
@@ -138,11 +139,12 @@ class CrawlerEngine:
             # Add seed URLs to frontier
             for url in seed_urls:
                 normalized_url = normalize_url(url)
-                if normalized_url:
-                    await self.url_frontier.add_url(normalized_url, priority=1.0, depth=0)
-                    logger.debug(f"Added seed URL: {normalized_url}")
+                logger.debug(f"Trying to add seed URL: {url} (normalized: {normalized_url})")
+                if self.url_frontier and normalized_url:
+                    added = await self.url_frontier.add_url(normalized_url, priority=1.0, depth=0)
+                    logger.debug(f"Result of adding {normalized_url}: {added}")
                 else:
-                    logger.warning(f"Invalid seed URL: {url}")
+                    logger.warning("URLFrontier is not initialized or normalized_url is invalid.")
             
             logger.info(f"Loaded {len(seed_urls)} seed URLs")
             
@@ -152,53 +154,109 @@ class CrawlerEngine:
     async def crawl_page(self, url_to_crawl: str, depth: int = 0) -> Optional[Dict[str, Any]]:
         """Crawl a single page and extract content."""
         try:
+            logger.debug(f"Crawling page: {url_to_crawl} at depth {depth}")
+            
+            # Check if URL is already seen in bloom filter
+            if self.bloom_filter and self.bloom_filter.contains(url_to_crawl):
+                logger.debug(f"URL already seen in bloom filter: {url_to_crawl}")
+                return None
+            
+            # Add URL to bloom filter to mark as seen
+            if self.bloom_filter:
+                self.bloom_filter.add(url_to_crawl)
+            
             # Check rate limits
             domain = get_domain(url_to_crawl)
-            if domain:
+            if self.rate_limiter and domain:
                 await self.rate_limiter.wait_if_needed(domain)
             
             # Check robots.txt
             if self.config.respect_robots_txt:
-                if not await self.robots_checker.can_fetch(url_to_crawl):
+                if self.robots_checker and not await self.robots_checker.can_fetch(url_to_crawl):
                     self.robots_denied += 1
                     logger.debug(f"Robots.txt denied: {url_to_crawl}")
+                    # Mark URL as completed since robots.txt denied it
+                    if self.url_frontier:
+                        await self.url_frontier.mark_completed(url_to_crawl)
                     return None
             
             # Fetch the page
-            async with self.session.get(url_to_crawl, allow_redirects=self.config.allow_redirects) as response:
-                if response.status != 200:
-                    logger.warning(f"HTTP {response.status} for {url_to_crawl}")
-                    return None
-                
-                content_type = response.headers.get('content-type', '').lower()
-                if not any(ct in content_type for ct in self.config.allowed_content_types):
-                    logger.debug(f"Unsupported content type {content_type} for {url_to_crawl}")
-                    return None
-                
-                # Read content
-                content = await response.text()
-                if len(content) > self.config.max_content_size:
-                    logger.warning(f"Content too large ({len(content)} bytes) for {url_to_crawl}")
-                    return None
-                
-                # Extract content and links
-                extracted_data = await self.content_extractor.extract(url_to_crawl, content, depth)
-                
-                # Add discovered links to frontier
-                if depth < self.config.max_depth:
-                    for link in extracted_data.get('links', []):
-                        resolved_url = resolve_relative_url(url_to_crawl, link)
-                        if resolved_url and self._is_valid_url(resolved_url):
-                            priority = self._calculate_priority(resolved_url, depth + 1)
-                            await self.url_frontier.add_url(resolved_url, priority=priority, depth=depth + 1)
-                
-                return extracted_data
+            if self.session:
+                async with self.session.get(url_to_crawl, allow_redirects=self.config.allow_redirects) as response:
+                    if response.status != 200:
+                        logger.warning(f"HTTP {response.status} for {url_to_crawl}")
+                        # Mark URL as completed since it failed
+                        if self.url_frontier:
+                            await self.url_frontier.mark_completed(url_to_crawl)
+                        return None
+                    
+                    content_type = response.headers.get('content-type', '').lower()
+                    if not any(ct in content_type for ct in self.config.allowed_content_types):
+                        logger.debug(f"Unsupported content type {content_type} for {url_to_crawl}")
+                        # Mark URL as completed since content type is not supported
+                        if self.url_frontier:
+                            await self.url_frontier.mark_completed(url_to_crawl)
+                        return None
+                    
+                    # Read content
+                    content = await response.text()
+                    if len(content) > self.config.max_content_size:
+                        logger.warning(f"Content too large ({len(content)} bytes) for {url_to_crawl}")
+                        # Mark URL as completed since content is too large
+                        if self.url_frontier:
+                            await self.url_frontier.mark_completed(url_to_crawl)
+                        return None
+                    
+                    # Extract content and links
+                    if self.content_extractor:
+                        extracted_data = await self.content_extractor.extract(url_to_crawl, content, depth)
+                    else:
+                        logger.warning("ContentExtractor is not initialized.")
+                        # Mark URL as completed since content extractor is not available
+                        if self.url_frontier:
+                            await self.url_frontier.mark_completed(url_to_crawl)
+                        return None
+                    
+                    # Add discovered links to frontier
+                    if depth < self.config.max_depth:
+                        unique_new_links_added = 0
+                        for link in extracted_data.get('links', []):
+                            resolved_url = resolve_relative_url(url_to_crawl, link)
+                            if resolved_url and self._is_valid_url(resolved_url):
+                                # Check if URL is already completed or seen
+                                if self.url_frontier and self.bloom_filter:
+                                    if not await self.url_frontier.is_url_completed(resolved_url) and \
+                                       not self.bloom_filter.contains(resolved_url):
+                                        priority = self._calculate_priority(resolved_url, depth + 1)
+                                        added_to_frontier = await self.url_frontier.add_url(resolved_url, priority=priority, depth=depth + 1)
+                                        if added_to_frontier:
+                                            unique_new_links_added += 1
+                                            logger.debug(f"New link added to frontier: {resolved_url}")
+                                else:
+                                    logger.warning("URLFrontier or BloomFilter not initialized.")
+                        
+                        if unique_new_links_added > 0:
+                            logger.debug(f"{unique_new_links_added} new links added from {url_to_crawl}")
+                    
+                    return extracted_data
+            else:
+                logger.warning("HTTP session is not initialized.")
+                # Mark URL as completed since session is not available
+                if self.url_frontier:
+                    await self.url_frontier.mark_completed(url_to_crawl)
+                return None
                 
         except asyncio.TimeoutError:
             logger.warning(f"Timeout crawling {url_to_crawl}")
+            # Mark URL as failed
+            if self.url_frontier:
+                await self.url_frontier.mark_failed(url_to_crawl, depth)
             return None
         except Exception as e:
             logger.error(f"Error crawling {url_to_crawl}: {e}")
+            # Mark URL as failed
+            if self.url_frontier:
+                await self.url_frontier.mark_failed(url_to_crawl, depth)
             return None
 
     def _is_valid_url(self, url: str) -> bool:
@@ -238,7 +296,14 @@ class CrawlerEngine:
         while self.running:
             try:
                 # Get next URL from frontier
-                url_data = await self.url_frontier.get_url()
+                if self.url_frontier:
+                    url_data = await self.url_frontier.get_url()
+                    logger.debug(f"Worker {worker_id}: got url_data: {url_data}")
+                else:
+                    logger.warning("URLFrontier is not initialized.")
+                    await asyncio.sleep(1)
+                    continue
+                
                 if not url_data:
                     await asyncio.sleep(1)
                     continue
@@ -256,7 +321,8 @@ class CrawlerEngine:
                 
                 if result:
                     self.pages_crawled += 1
-                    self.metrics.pages_crawled += 1
+                    if self.metrics:
+                        self.metrics.pages_crawled += 1
                     
                     # Save or send the result
                     await self._save_document(result)
@@ -264,10 +330,12 @@ class CrawlerEngine:
                     logger.debug(f"Worker {worker_id}: Crawled {url} (depth {depth})")
                 else:
                     self.errors += 1
-                    self.metrics.errors += 1
+                    if self.metrics:
+                        self.metrics.errors += 1
                 
                 # Mark URL as completed
-                await self.url_frontier.mark_completed(url)
+                if self.url_frontier:
+                    await self.url_frontier.mark_completed(url)
                 
                 # Delay between requests
                 if self.config.default_delay > 0:
@@ -279,7 +347,8 @@ class CrawlerEngine:
             except Exception as e:
                 logger.error(f"Worker {worker_id} error: {e}")
                 self.errors += 1
-                self.metrics.errors += 1
+                if self.metrics:
+                    self.metrics.errors += 1
                 await asyncio.sleep(1)
         
         logger.info(f"Worker {worker_id} finished")
@@ -293,7 +362,7 @@ class CrawlerEngine:
             
             if self.config.enable_kafka_output and self.kafka_producer:
                 # Send to Kafka
-                await self.kafka_producer.send_and_wait(
+                self.kafka_producer.send_and_wait(
                     self.config.output_topic,
                     json.dumps(document).encode('utf-8')
                 )

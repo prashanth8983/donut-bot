@@ -9,8 +9,8 @@ from typing import Dict, Any, Optional, List
 from aiokafka import AIOKafkaProducer
 from aiokafka.errors import KafkaError as AIOKafkaError
 
-from ..core.logger import get_logger
-from ..exceptions import KafkaError
+from core.logger import get_logger
+from exceptions import KafkaError
 
 logger = get_logger("kafka_service")
 

@@ -129,7 +129,7 @@ class JobUpdate(MongoBaseModel):
 class JobResponse(JobBase):
     """Schema for job responses."""
     # Use string for id field to avoid serialization issues
-    id: str = Field(alias="_id", description="Job ID")
+    id: str = Field(..., description="Job ID")
     
     # Runtime fields
     status: str = Field(default="queued", description="Job status")
@@ -145,7 +145,9 @@ class JobResponse(JobBase):
     updated_at: datetime = Field(description="Last update timestamp")
     start_time: Optional[datetime] = Field(default=None, description="Job start time")
     end_time: Optional[datetime] = Field(default=None, description="Job end time")
-    
+
+    model_config = ConfigDict(extra='ignore')
+
     @field_validator('status')
     @classmethod
     def validate_status(cls, v):

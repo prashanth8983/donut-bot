@@ -13,7 +13,7 @@
   "kafka_topic": "raw-documents",
   "enable_kafka_output": false,
   "enable_local_save": true,
-  "local_output_dir": "/app/crawler_output",
+  "local_output_dir": "./crawler_output",
   "default_workers": 3,
   "default_max_depth": 3,
   "default_max_pages": 4000,
@@ -21,8 +21,7 @@
   "default_allowed_domains": [
     "northeastern.edu",
     "nyu.edu",
-    "stanford.edu",
-    "mit.edu"
+    "stanford.edu"
   ],
   "secret_key": "your-secret-key-here",
   "access_token_expire_minutes": 30,

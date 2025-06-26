@@ -7,10 +7,10 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 
-from ....db.schemas import ScheduledJobCreate, ScheduledJobUpdate, ScheduledJobResponse, ScheduledJobListResponse, NextRunsResponse
-from ....services.scheduler_service import get_scheduler_service, SchedulerService
-from ....exceptions import JobNotFoundError, DatabaseError
-from ....core.logger import get_logger
+from db.schemas import ScheduledJobCreate, ScheduledJobUpdate, ScheduledJobResponse, ScheduledJobListResponse, NextRunsResponse
+from services.scheduler_service import get_scheduler_service, SchedulerService
+from exceptions import JobNotFoundError, DatabaseError
+from core.logger import get_logger
 
 logger = get_logger("scheduler_api")
 router = APIRouter()
@@ -47,7 +47,7 @@ async def create_scheduled_job(
 
 @router.get("/jobs", response_model=ScheduledJobListResponse)
 async def get_scheduled_jobs(
-    status: Optional[str] = Query(None, description="Filter by job status"),
+    job_status: Optional[str] = Query(None, description="Filter by job status"),
     priority: Optional[str] = Query(None, description="Filter by priority"),
     domain: Optional[str] = Query(None, description="Filter by domain"),
     page: int = Query(1, ge=1, description="Page number"),
@@ -57,7 +57,7 @@ async def get_scheduled_jobs(
     """Get scheduled jobs with optional filtering and pagination."""
     try:
         jobs = await scheduler_service.get_scheduled_jobs(
-            status=status,
+            status=job_status,
             priority=priority,
             domain=domain,
             page=page,
@@ -76,6 +76,18 @@ async def get_scheduled_jobs(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
         )
+
+
+@router.get("/jobs/", response_model=ScheduledJobListResponse, include_in_schema=False)
+async def get_scheduled_jobs_slash(
+    job_status: Optional[str] = Query(None, description="Filter by job status"),
+    priority: Optional[str] = Query(None, description="Filter by priority"),
+    domain: Optional[str] = Query(None, description="Filter by domain"),
+    page: int = Query(1, ge=1, description="Page number"),
+    size: int = Query(100, ge=1, le=1000, description="Page size"),
+    scheduler_service: SchedulerService = Depends(get_scheduler_service)
+):
+    return await get_scheduled_jobs(job_status, priority, domain, page, size, scheduler_service)
 
 
 @router.get("/jobs/{job_id}", response_model=ScheduledJobResponse)
@@ -239,4 +251,12 @@ async def get_next_runs(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
-        ) 
+        )
+
+
+@router.get("/next-runs/", response_model=NextRunsResponse, include_in_schema=False)
+async def get_next_runs_slash(
+    limit: int = Query(10, ge=1, le=50, description="Number of next runs to return"),
+    scheduler_service: SchedulerService = Depends(get_scheduler_service)
+):
+    return await get_next_runs(limit, scheduler_service) 

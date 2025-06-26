@@ -11,12 +11,10 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY api_crawler.py .
-COPY web_crawler.py .
-COPY donutbot/ ./donutbot/
+COPY . .
 
 RUN mkdir -p /app/logs
-RUN mkdir -p /app/output
+RUN mkdir -p /app/crawler_output
 RUN useradd -m -s /bin/bash crawler
 RUN chown -R crawler:crawler /app
 USER crawler
@@ -32,7 +30,5 @@ ENV PYTHONPATH=/app
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:${API_PORT}/api/v1/health || exit 1
 
-CMD ["python", "api_crawler.py", \
-  "--host", "0.0.0.0", \
-  "--port", "8089", \
-  "--log-level", "INFO"]
+WORKDIR /app
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8089"]

@@ -37,16 +37,9 @@ class CrawlerConfigModel(BaseModel):
     rate_limits: Dict[str, float] = field(default_factory=dict)
     
     # Domain and URL settings
-    allowed_domains: List[str] = field(default_factory=lambda: [
-        "northeastern.edu", "nyu.edu", "stanford.edu",
-        "www.northeastern.edu", "www.nyu.edu", "www.stanford.edu"
-    ])
-    seed_urls: List[str] = field(default_factory=lambda: [
-        "https://www.northeastern.edu/academics/",
-        "https://www.nyu.edu/academics/",
-        "https://www.stanford.edu/academics/"
-    ])
-    seed_urls_file: Optional[str] = "/app/seed_urls.txt"
+    allowed_domains: List[str] = field(default_factory=list)
+    seed_urls: List[str] = field(default_factory=list)
+    seed_urls_file: Optional[str] = None
     
     # Content filtering
     excluded_extensions: List[str] = field(default_factory=lambda: [
@@ -119,16 +112,9 @@ class CrawlerConfig:
     allow_redirects: bool = True
     default_delay: float = 2.0
     rate_limits: Dict[str, float] = field(default_factory=dict)
-    allowed_domains: List[str] = field(default_factory=lambda: [
-        "northeastern.edu", "nyu.edu", "stanford.edu",
-        "www.northeastern.edu", "www.nyu.edu", "www.stanford.edu"
-    ])
-    seed_urls: List[str] = field(default_factory=lambda: [
-        "https://www.northeastern.edu/academics/",
-        "https://www.nyu.edu/academics/",
-        "https://www.stanford.edu/academics/"
-    ])
-    seed_urls_file: Optional[str] = "/app/seed_urls.txt"
+    allowed_domains: List[str] = field(default_factory=list)
+    seed_urls: List[str] = field(default_factory=list)
+    seed_urls_file: Optional[str] = None
     excluded_extensions: List[str] = field(default_factory=lambda: [
         '.pdf', '.zip', '.rar', '.gz', '.tar', '.mp3', '.mp4', '.avi', '.mov',
         '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.ico', '.css', '.js',
