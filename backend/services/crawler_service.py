@@ -7,12 +7,15 @@ import asyncio
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
 
-from ..core.crawler.engine import CrawlerEngine
-from ..core.crawler.config import CrawlerConfig
-from ..core.logger import get_logger
-from ..exceptions import CrawlError, ConfigurationError
-from .kafka_service import get_kafka_service
-from .file_storage_service import get_file_storage_service
+from core.crawler.engine import CrawlerEngine
+from core.crawler.config import CrawlerConfig
+from core.logger import get_logger
+from exceptions import CrawlError, ConfigurationError
+from services.kafka_service import get_kafka_service
+from services.file_storage_service import get_file_storage_service
+from services.job_service import JobService
+from db.database import database
+from db.schemas import JobUpdate
 
 logger = get_logger("crawler_service")
 
@@ -24,8 +27,11 @@ class CrawlerService:
         self.crawler_engine: Optional[CrawlerEngine] = None
         self.config: Optional[CrawlerConfig] = None
         self.crawler_task: Optional[asyncio.Task] = None
+        self.progress_task: Optional[asyncio.Task] = None
         self.kafka_service = None
         self.file_storage_service = None
+        self.job_service: Optional[JobService] = None
+        self.current_job_id: Optional[str] = None
         
     async def initialize(self, config: CrawlerConfig):
         """Initialize the crawler service with configuration."""
@@ -34,6 +40,9 @@ class CrawlerService:
             self.config = config
             self.crawler_engine = CrawlerEngine(config)
             await self.crawler_engine.initialize()
+            
+            # Initialize job service for progress tracking
+            self.job_service = JobService(database)
             
             # Initialize Kafka service if configured
             if config.enable_kafka_output and config.kafka_brokers and config.output_topic:
@@ -51,7 +60,7 @@ class CrawlerService:
             logger.error(f"Failed to initialize crawler service: {e}")
             raise ConfigurationError(f"Crawler service initialization failed: {e}")
     
-    async def start_crawler(self) -> bool:
+    async def start_crawler(self, job_id: Optional[str] = None) -> bool:
         """Start the crawler engine."""
         try:
             if not self.crawler_engine:
@@ -62,7 +71,24 @@ class CrawlerService:
                 return True
             
             logger.info("Starting crawler...")
+            self.current_job_id = job_id
+            
+            # Mark job as running if job_id is provided
+            if job_id and self.job_service:
+                try:
+                    # Update job status to running
+                    await self.job_service.start_job(job_id)
+                    logger.info(f"Marked job {job_id} as running")
+                except Exception as e:
+                    logger.error(f"Failed to mark job {job_id} as running: {e}")
+            
             self.crawler_task = asyncio.create_task(self.crawler_engine.run())
+            
+            # Start progress tracking if job_id is provided
+            if job_id and self.job_service:
+                self.progress_task = asyncio.create_task(self._track_progress(job_id))
+                logger.info(f"Started progress tracking for job: {job_id}")
+            
             return True
             
         except Exception as e:
@@ -73,22 +99,51 @@ class CrawlerService:
         """Stop the crawler engine."""
         try:
             if not self.crawler_engine:
+                logger.warning("Crawler engine not initialized")
                 return True
             
             if not self.crawler_engine.running:
-                logger.warning("Crawler is not running")
+                logger.info("Crawler is not running")
                 return True
             
             logger.info("Stopping crawler...")
+            
+            # Stop the crawler engine
             await self.crawler_engine.stop()
             
-            if self.crawler_task and not self.crawler_task.done():
-                self.crawler_task.cancel()
+            # Cancel progress tracking task
+            if self.progress_task and not self.progress_task.done():
+                self.progress_task.cancel()
                 try:
-                    await self.crawler_task
+                    await self.progress_task
                 except asyncio.CancelledError:
                     pass
             
+            # Mark job as completed if it was running
+            if self.current_job_id and self.job_service:
+                try:
+                    # Get final stats from crawler
+                    status = await self.crawler_engine.get_status()
+                    pages_crawled = status.get('pages_crawled_total', 0)
+                    
+                    final_stats = {
+                        'pages_found': pages_crawled,
+                        'errors': status.get('total_errors_count', 0),
+                        'data_size': f"{pages_crawled * 0.1:.1f} MB",
+                        'avg_response_time': f"{status.get('avg_pages_per_second', 0):.1f}s",
+                        'success_rate': 100.0 if pages_crawled == 0 else max(0, 100 - (status.get('total_errors_count', 0) / pages_crawled * 100))
+                    }
+                    
+                    await self.job_service.complete_job(self.current_job_id, final_stats)
+                    logger.info(f"Marked job {self.current_job_id} as completed after manual stop")
+                except Exception as e:
+                    logger.error(f"Failed to mark job {self.current_job_id} as completed: {e}")
+            
+            self.current_job_id = None
+            self.crawler_task = None
+            self.progress_task = None
+            
+            logger.info("Crawler stopped successfully")
             return True
             
         except Exception as e:
@@ -237,7 +292,17 @@ class CrawlerService:
             # Add timestamp if not present
             if "timestamp" not in document:
                 document["timestamp"] = datetime.now(timezone.utc).isoformat()
-            
+
+            # Add job_name for file storage
+            if self.current_job_id and self.job_service:
+                job = await self.job_service.get_job_by_id(self.current_job_id)
+                if job:
+                    document["job_name"] = job.name
+                else:
+                    document["job_name"] = self.current_job_id
+            else:
+                document["job_name"] = "unknown_job"
+
             success = True
             
             # Send to Kafka if enabled
@@ -292,6 +357,75 @@ class CrawlerService:
             logger.error(f"Error in batch processing: {e}")
         
         return results
+
+    async def _track_progress(self, job_id: str):
+        """Track and update job progress periodically."""
+        try:
+            while self.crawler_engine and self.crawler_engine.running:
+                try:
+                    # Get current crawler status
+                    status = await self.crawler_engine.get_status()
+                    
+                    # Calculate progress based on pages crawled vs max pages
+                    pages_crawled = status.get('pages_crawled_total', 0)
+                    max_pages = status.get('max_pages_configured', 0)
+                    queue_size = status.get('frontier_queue_size', 0)
+                    completed = status.get('urls_completed_redis', 0)
+                    
+                    # Calculate progress
+                    if max_pages and max_pages != "Unlimited":
+                        progress = min(100.0, (pages_crawled / max_pages) * 100)
+                    else:
+                        # If no max pages limit, calculate based on queue size and completed
+                        total = queue_size + completed
+                        if total > 0:
+                            progress = min(100.0, (completed / total) * 100)
+                        else:
+                            progress = 0.0
+                    
+                    # Check if crawler is done (queue empty and no pages in processing)
+                    urls_in_processing = status.get('urls_in_processing', 0)
+                    if queue_size == 0 and urls_in_processing == 0 and pages_crawled > 0:
+                        # Crawler is done, mark job as completed
+                        if self.job_service:
+                            final_stats = {
+                                'pages_found': pages_crawled,
+                                'errors': status.get('total_errors_count', 0),
+                                'data_size': f"{pages_crawled * 0.1:.1f} MB",
+                                'avg_response_time': f"{status.get('avg_pages_per_second', 0):.1f}s",
+                                'success_rate': 100.0 if pages_crawled == 0 else max(0, 100 - (status.get('total_errors_count', 0) / pages_crawled * 100))
+                            }
+                            await self.job_service.complete_job(job_id, final_stats)
+                            logger.info(f"Marked job {job_id} as completed with {pages_crawled} pages")
+                            break
+                    
+                    # Prepare stats for job update
+                    stats = {
+                        'pages_found': pages_crawled,
+                        'errors': status.get('total_errors_count', 0),
+                        'data_size': f"{pages_crawled * 0.1:.1f} MB",  # Rough estimate
+                        'avg_response_time': f"{status.get('avg_pages_per_second', 0):.1f}s",
+                        'success_rate': 100.0 if pages_crawled == 0 else max(0, 100 - (status.get('total_errors_count', 0) / pages_crawled * 100))
+                    }
+                    
+                    # Update job progress
+                    if self.job_service:
+                        await self.job_service.update_job_progress(job_id, progress, stats)
+                        logger.debug(f"Updated job {job_id} progress: {progress:.1f}% ({pages_crawled} pages)")
+                    
+                    # Wait before next update
+                    await asyncio.sleep(5)  # Update every 5 seconds
+                    
+                except asyncio.CancelledError:
+                    break
+                except Exception as e:
+                    logger.error(f"Error tracking progress for job {job_id}: {e}")
+                    await asyncio.sleep(5)
+                    
+        except asyncio.CancelledError:
+            logger.info(f"Progress tracking cancelled for job {job_id}")
+        except Exception as e:
+            logger.error(f"Progress tracking failed for job {job_id}: {e}")
 
 
 # Global crawler service instance

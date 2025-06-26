@@ -12,8 +12,8 @@ from typing import Dict, Any, List, Optional
 import hashlib
 from urllib.parse import urlparse
 
-from ..core.logger import get_logger
-from ..exceptions import ServiceError
+from core.logger import get_logger
+from exceptions import ServiceError
 
 logger = get_logger("file_storage_service")
 
@@ -60,10 +60,15 @@ class FileStorageService:
         
         return f"{domain}_{path}_{url_hash}.json"
     
-    def _get_document_path(self, url: str) -> Path:
-        """Get the file path for a document."""
+    def _sanitize_folder_name(self, name: str) -> str:
+        """Sanitize folder name for filesystem safety."""
+        return ''.join(c if c.isalnum() or c in ('-', '_') else '_' for c in name)[:64]
+
+    def _get_document_path(self, url: str, job_name: str = 'unknown_job') -> Path:
+        """Get the file path for a document, using a job-specific subfolder."""
         filename = self._get_safe_filename(url)
-        return self.output_dir / "documents" / filename
+        safe_job = self._sanitize_folder_name(job_name)
+        return self.output_dir / "documents" / safe_job / filename
     
     async def save_document(self, document: Dict[str, Any]) -> bool:
         """
@@ -81,7 +86,9 @@ class FileStorageService:
         
         try:
             url = document.get("url", "unknown")
-            file_path = self._get_document_path(url)
+            job_name = document.get("job_name") or document.get("job") or "unknown_job"
+            file_path = self._get_document_path(url, job_name)
+            file_path.parent.mkdir(parents=True, exist_ok=True)
             
             # Add metadata
             document_with_metadata = {
