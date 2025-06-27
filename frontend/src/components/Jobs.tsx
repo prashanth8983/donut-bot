@@ -24,6 +24,7 @@ export const Jobs: React.FC<JobsProps> = ({ onRefresh }) => {
   const [deleting, setDeleting] = useState(false);
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [selectedJob, setSelectedJob] = useState<CrawlJob | null>(null);
+  const [initialLoading, setInitialLoading] = useState(true);
 
   const jobsApi = useApi<JobsApiResponse>();
   const createJobApi = useApi<CrawlJob>();
@@ -35,6 +36,7 @@ export const Jobs: React.FC<JobsProps> = ({ onRefresh }) => {
     params.append('limit', '100');
 
     await jobsApi.execute(() => apiService.getJobs());
+    setInitialLoading(false);
   };
 
   useEffect(() => {
@@ -184,7 +186,7 @@ export const Jobs: React.FC<JobsProps> = ({ onRefresh }) => {
           </button>
         </div>
 
-        {jobsApi.loading && !jobsApi.data && (
+        {initialLoading && jobsApi.loading && !jobsApi.data && (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <div key={i} className={`${isDarkMode ? 'bg-stone-800 border-stone-700' : 'bg-white border-gray-200'} p-6 rounded-lg border animate-pulse`}>
