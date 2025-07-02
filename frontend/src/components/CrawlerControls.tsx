@@ -11,18 +11,29 @@ export const CrawlerControls: React.FC = () => {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [uptime, setUptime] = useState<number>(0);
 
+  const fetchStatus = React.useCallback(async () => {
+    try {
+      const response = await apiService.getCrawlerStatus();
+      if (response.success) {
+        setStatus(response.data || null);
+      }
+    } catch (error: unknown) {
+      showNotification(`Failed to fetch status: ${(error as Error).message || String(error)}`, 'error');
+    }
+  }, [showNotification]);
+
   useEffect(() => {
     fetchStatus();
     const interval = setInterval(fetchStatus, 3000); // Update every 3 seconds
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchStatus]);
 
   // Whenever status.uptime_seconds changes, reset local uptime
   useEffect(() => {
     if (status && typeof status.uptime_seconds === 'number') {
       setUptime(status.uptime_seconds);
     }
-  }, [status?.uptime_seconds]);
+  }, [status]);
 
   // Increment uptime every second
   useEffect(() => {
@@ -32,18 +43,7 @@ export const CrawlerControls: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
-  const fetchStatus = async () => {
-    try {
-      const response = await apiService.getCrawlerStatus();
-      if (response.success) {
-        setStatus(response.data || null);
-      }
-    } catch (error) {
-      console.error('Failed to fetch status:', error);
-    }
-  };
-
-  const handleAction = async (action: string, apiCall: () => Promise<any>) => {
+  const handleAction = React.useCallback(async (action: string, apiCall: () => Promise<ApiResponse<unknown>>) => {
     setActionLoading(action);
     try {
       const response = await apiCall();
@@ -53,12 +53,12 @@ export const CrawlerControls: React.FC = () => {
       } else {
         showNotification(`Failed to ${action} crawler: ${response.error}`, 'error');
       }
-    } catch (error) {
-      showNotification(`Failed to ${action} crawler`, 'error');
+    } catch (error: unknown) {
+      showNotification(`Failed to ${action} crawler: ${(error as Error).message || String(error)}`, 'error');
     } finally {
       setActionLoading(null);
     }
-  };
+  }, [fetchStatus, showNotification]);
 
   const handleStart = () => {
     handleAction('start', () => apiService.startCrawler());

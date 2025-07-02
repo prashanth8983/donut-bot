@@ -14,6 +14,7 @@ router = APIRouter()
 
 @router.get("/")
 async def get_metrics(
+    time_range: str = "24h",
     metrics_service: MetricsService = Depends(get_metrics_service)
 ):
     """Get crawler metrics."""

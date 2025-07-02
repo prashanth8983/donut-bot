@@ -33,12 +33,12 @@ class CrawlerService:
         self.job_service: Optional[JobService] = None
         self.current_job_id: Optional[str] = None
         
-    async def initialize(self, config: CrawlerConfig):
+    async def initialize(self, config: CrawlerConfig, mongodb_client):
         """Initialize the crawler service with configuration."""
         try:
             logger.info("Initializing crawler service...")
             self.config = config
-            self.crawler_engine = CrawlerEngine(config)
+            self.crawler_engine = CrawlerEngine(config, mongodb_client)
             await self.crawler_engine.initialize()
             
             # Initialize job service for progress tracking

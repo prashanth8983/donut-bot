@@ -22,9 +22,9 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ isOpen, 
     if (isOpen) {
       fetchConfiguration();
     }
-  }, [isOpen]);
+  }, [isOpen, fetchConfiguration]);
 
-  const fetchConfiguration = async () => {
+  const fetchConfiguration = React.useCallback(async () => {
     setLoading(true);
     try {
       const [configRes, domainsRes] = await Promise.all([
@@ -39,12 +39,12 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ isOpen, 
       if (domainsRes.success) {
         setAllowedDomains(domainsRes.data?.allowed_domains || []);
       }
-    } catch (error) {
-      showNotification('Failed to load configuration', 'error');
+    } catch (error: unknown) {
+      showNotification(`Failed to load configuration: ${(error as Error).message || String(error)}`, 'error');
     } finally {
       setLoading(false);
     }
-  };
+  }, [showNotification]);
 
   const handleSaveConfig = async () => {
     setSaving(true);
@@ -55,8 +55,8 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ isOpen, 
       } else {
         showNotification(`Failed to save configuration: ${response.error}`, 'error');
       }
-    } catch (error) {
-      showNotification('Failed to save configuration', 'error');
+    } catch (error: unknown) {
+      showNotification(`Failed to save configuration: ${(error as Error).message || String(error)}`, 'error');
     } finally {
       setSaving(false);
     }
@@ -74,8 +74,8 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ isOpen, 
       } else {
         showNotification(`Failed to add domain: ${response.error}`, 'error');
       }
-    } catch (error) {
-      showNotification('Failed to add domain', 'error');
+    } catch (error: unknown) {
+      showNotification(`Failed to add domain: ${(error as Error).message || String(error)}`, 'error');
     }
   };
 
@@ -88,12 +88,12 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ isOpen, 
       } else {
         showNotification(`Failed to remove domain: ${response.error}`, 'error');
       }
-    } catch (error) {
-      showNotification('Failed to remove domain', 'error');
+    } catch (error: unknown) {
+      showNotification(`Failed to remove domain: ${(error as Error).message || String(error)}`, 'error');
     }
   };
 
-  const updateConfig = (key: keyof CrawlerConfig, value: any) => {
+  const updateConfig = (key: keyof CrawlerConfig, value: CrawlerConfig[keyof CrawlerConfig]) => {
     setConfig(prev => ({ ...prev, [key]: value }));
   };
 
@@ -137,7 +137,7 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ isOpen, 
           ].map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id as 'basic' | 'advanced' | 'domains')}
               className={`px-6 py-3 text-sm font-medium transition-colors ${
                 activeTab === tab.id
                   ? 'text-blue-600 border-b-2 border-blue-600'

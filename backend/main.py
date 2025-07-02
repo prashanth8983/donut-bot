@@ -12,7 +12,7 @@ import uvicorn
 
 from config import settings
 from core.logger import get_logger
-from db.database import database
+from db.mongodb import mongodb_client
 from services.crawler_service import crawler_service
 from services.scheduler_service import get_scheduler_service, close_scheduler_service
 from services.kafka_service import close_kafka_service
@@ -32,10 +32,10 @@ async def lifespan(app: FastAPI):
     try:
         # Initialize database (optional for local development)
         try:
-            await database.connect()
-            logger.info("Database initialized")
+            await mongodb_client.connect()
+            logger.info("MongoDB client connected")
         except Exception as e:
-            logger.warning(f"Database connection failed (continuing without DB): {e}")
+            logger.warning(f"MongoDB connection failed (continuing without MongoDB): {e}")
         
         # Initialize crawler service (optional for local development)
         try:
@@ -54,7 +54,7 @@ async def lifespan(app: FastAPI):
                 enable_local_save=settings.enable_local_save,
                 local_output_dir=settings.local_output_dir
             )
-            await crawler_service.initialize(crawler_config)
+            await crawler_service.initialize(crawler_config, mongodb_client)
             # Don't automatically start the crawler - it should only start when a job is created
             logger.info("Crawler service initialized successfully (not started automatically)")
         except Exception as e:
@@ -114,10 +114,10 @@ async def lifespan(app: FastAPI):
         
         # Disconnect from database
         try:
-            await database.disconnect()
-            logger.info("Database disconnected")
+            await mongodb_client.close()
+            logger.info("MongoDB client closed")
         except Exception as e:
-            logger.warning(f"Error disconnecting from database: {e}")
+            logger.warning(f"Error disconnecting from MongoDB: {e}")
         
         logger.info("Backend shutdown completed successfully")
         

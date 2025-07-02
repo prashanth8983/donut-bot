@@ -133,11 +133,11 @@ class ApiService {
   }
 
   // Metrics and Statistics
-  async getMetrics(): Promise<ApiResponse<Metrics>> {
-    return this.request<Metrics>('/api/v1/metrics/');
+  async getMetrics(timeRange: '24h' | '7d' | 'all'): Promise<ApiResponse<Metrics>> {
+    return this.request<Metrics>(`/api/v1/metrics/?time_range=${timeRange}`);
   }
 
-  async getStats(): Promise<ApiResponse<any>> {
+  async getStats(): Promise<ApiResponse<unknown>> {
     return this.request('/api/v1/stats');
   }
 
@@ -146,11 +146,11 @@ class ApiService {
   }
 
   // Results and Data
-  async getResults(): Promise<ApiResponse<any[]>> {
+  async getResults(): Promise<ApiResponse<unknown[]>> {
     return this.request('/api/v1/results');
   }
 
-  async getResultByUrl(urlHash: string): Promise<ApiResponse<any>> {
+  async getResultByUrl(urlHash: string): Promise<ApiResponse<unknown>> {
     return this.request(`/api/v1/results/${urlHash}`);
   }
 

@@ -29,9 +29,9 @@ export const ResultsBrowser: React.FC = () => {
 
   useEffect(() => {
     fetchResults();
-  }, []);
+  }, [fetchResults]);
 
-  const fetchResults = async () => {
+  const fetchResults = React.useCallback(async () => {
     setLoading(true);
     try {
       const response = await apiService.getResults();
@@ -40,12 +40,12 @@ export const ResultsBrowser: React.FC = () => {
       } else {
         showNotification(`Failed to fetch results: ${response.error}`, 'error');
       }
-    } catch (error) {
-      showNotification('Failed to fetch results', 'error');
+    } catch (error: unknown) {
+      showNotification(`Failed to fetch results: ${(error as Error).message || String(error)}`, 'error');
     } finally {
       setLoading(false);
     }
-  };
+  }, [showNotification]);
 
   const filteredResults = results.filter(result => {
     const matchesSearch = !searchTerm || 
@@ -148,8 +148,8 @@ export const ResultsBrowser: React.FC = () => {
       } else {
         showNotification(`Failed to clear results: ${response.error}`, 'error');
       }
-    } catch (error) {
-      showNotification('Failed to clear results', 'error');
+    } catch (error: unknown) {
+      showNotification(`Failed to clear results: ${(error as Error).message || String(error)}`, 'error');
     }
   };
 

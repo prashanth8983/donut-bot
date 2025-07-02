@@ -32,7 +32,7 @@ logger = get_logger("crawler.engine")
 class CrawlerEngine:
     """Main crawler engine for donut-bot."""
     
-    def __init__(self, config: CrawlerConfig):
+    def __init__(self, config: CrawlerConfig, mongodb_client=None):
         self.config = config
         self.running = False
         self.start_time = None
@@ -45,11 +45,13 @@ class CrawlerEngine:
         self.rate_limiter = None
         self.bloom_filter = None
         self.kafka_producer = None
+        self.mongodb_client = mongodb_client
         
         # Crawler state
         self.pages_crawled = 0
         self.errors = 0
         self.robots_denied = 0
+        self.historical_metrics = [] # New: Store historical metric snapshots
         
         logger.info(f"Crawler Engine initialized with config: workers={config.workers}, max_depth={config.max_depth}, max_pages={config.max_pages}")
 
@@ -191,6 +193,8 @@ class CrawlerEngine:
                         return None
                     
                     content_type = response.headers.get('content-type', '').lower()
+                    if self.metrics:
+                        self.metrics.add_content_type(content_type.split(';')[0])
                     if not any(ct in content_type for ct in self.config.allowed_content_types):
                         logger.debug(f"Unsupported content type {content_type} for {url_to_crawl}")
                         # Mark URL as completed since content type is not supported
@@ -200,12 +204,18 @@ class CrawlerEngine:
                     
                     # Read content
                     content = await response.text()
-                    if len(content) > self.config.max_content_size:
-                        logger.warning(f"Content too large ({len(content)} bytes) for {url_to_crawl}")
+                    content_length = len(content.encode('utf-8')) # Get size in bytes
+                    if self.metrics:
+                        self.metrics.add_data_size(content_length)
+                    if content_length > self.config.max_content_size:
+                        logger.warning(f"Content too large ({content_length} bytes) for {url_to_crawl}")
                         # Mark URL as completed since content is too large
                         if self.url_frontier:
                             await self.url_frontier.mark_completed(url_to_crawl)
                         return None
+                    
+                    if self.metrics:
+                        self.metrics.add_status_code(response.status)
                     
                     # Extract content and links
                     if self.content_extractor:
@@ -429,6 +439,26 @@ class CrawlerEngine:
                 
                 logger.info(f"Metrics: pages={self.pages_crawled}, errors={self.errors}, "
                           f"rate={rate:.2f} pages/sec, uptime={uptime:.1f}s")
+
+                # Capture a snapshot of current metrics
+                metric_snapshot = {
+                    'timestamp': datetime.now(timezone.utc),
+                    'pages_crawled': self.pages_crawled,
+                    'errors': self.errors,
+                    'queue_size': await self.url_frontier.size() if self.url_frontier else 0,
+                    'content_type_counts': dict(self.metrics.content_type_counts) if self.metrics else {},
+                    'status_code_counts': dict(self.metrics.status_code_counts) if self.metrics else {},
+                    'data_size_bytes': self.metrics.total_data_size_bytes if self.metrics else 0
+                }
+                logger.info(f"Captured metric snapshot: {metric_snapshot}") # Added logging
+                self.historical_metrics.append(metric_snapshot) # Keep in-memory for current session
+                
+                if self.mongodb_client and self.mongodb_client.db:
+                    try:
+                        await self.mongodb_client.db.metrics_history.insert_one(metric_snapshot)
+                        logger.info("Metric snapshot saved to MongoDB.") # Added logging
+                    except Exception as e:
+                        logger.error(f"Error saving metric snapshot to MongoDB: {e}")
                 
             except asyncio.CancelledError:
                 break
@@ -463,4 +493,36 @@ class CrawlerEngine:
             'active_workers_configured': self.config.workers,
             'current_time_utc': datetime.now(timezone.utc).isoformat(),
             'allowed_domains': self.config.allowed_domains or []
-        } 
+        }
+
+    async def get_historical_data(self, start_time: datetime, end_time: datetime) -> List[Dict[str, Any]]:
+        """Retrieve historical metric snapshots within a given time range."""
+        if not self.mongodb_client or not self.mongodb_client.db:
+            logger.warning("MongoDB client not initialized, returning in-memory historical data.")
+            # Fallback to in-memory if MongoDB is not available
+            filtered_data = []
+            for snapshot in self.historical_metrics:
+                snapshot_time = datetime.fromisoformat(snapshot['timestamp']).replace(tzinfo=timezone.utc)
+                if start_time <= snapshot_time <= end_time:
+                    filtered_data.append(snapshot)
+            return filtered_data
+
+        try:
+            # Fetch from MongoDB
+            cursor = self.mongodb_client.db.metrics_history.find({
+                'timestamp': {
+                    '$gte': start_time,
+                    '$lte': end_time
+                }
+            }).sort('timestamp', 1)
+            
+            historical_data = []
+            async for document in cursor:
+                # Convert ObjectId to string if present
+                if '_id' in document:
+                    document['_id'] = str(document['_id'])
+                historical_data.append(document)
+            return historical_data
+        except Exception as e:
+            logger.error(f"Error fetching historical data from MongoDB: {e}")
+            return [] 

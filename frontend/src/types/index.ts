@@ -1,4 +1,4 @@
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T> {
   success: boolean;
   data?: T;
   error?: string;
@@ -86,6 +86,12 @@ export interface Metrics {
   robots_denied: number;
   avg_response_time: number;
   cache_hit_rate: number;
+  pages_crawled_over_time: number[];
+  errors_over_time: number[];
+  total_data_size?: string;
+  content_type_counts?: Record<string, number>;
+  status_code_counts?: Record<string, number>;
+  queue_size_over_time?: number[];
 }
 
 export interface ScheduledJob {

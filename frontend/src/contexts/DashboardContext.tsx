@@ -1,11 +1,5 @@
 import { createContext, useState, useContext, type ReactNode } from 'react';
-
-interface MenuItem {
-  id: string;
-  title: string;
-  path: string;
-  icon: string;
-}
+import { menuItems } from '../constants/menuItems';
 
 export interface Notification {
     id: string;
@@ -27,15 +21,6 @@ interface DashboardContextType {
 }
 
 const DashboardContext = createContext<DashboardContextType | undefined>(undefined);
-
-const menuItems: MenuItem[] = [
-    { id: 'dashboard', title: 'Dashboard', path: '/dashboard', icon: 'fa-solid fa-chart-line' },
-    { id: 'jobs', title: 'Crawl Jobs', path: '/jobs', icon: 'fa-solid fa-tasks' },
-    { id: 'domains', title: 'Domain Manager', path: '/domains', icon: 'fa-solid fa-globe' },
-    { id: 'results', title: 'Results', path: '/results', icon: 'fa-solid fa-file-text' },
-    { id: 'scheduler', title: 'Job Scheduler', path: '/scheduler', icon: 'fa-solid fa-calendar-alt' },
-    { id: 'settings', title: 'Settings', path: '/settings', icon: 'fa-solid fa-gear' }
-];
 
 export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     const [isDarkMode, setIsDarkMode] = useState(false);

@@ -1,4 +1,6 @@
+import * as React from 'react';
 import { useState, useCallback } from 'react';
+import type { ApiResponse } from '../types';
 
 interface UseApiState<T> {
   data: T | null;
@@ -13,7 +15,7 @@ export function useApi<T>() {
     error: null,
   });
 
-  const execute = useCallback(async (apiCall: () => Promise<any>) => {
+  const execute = useCallback(async (apiCall: () => Promise<ApiResponse<T>>) => {
     setState(prev => ({ ...prev, loading: true, error: null }));
     
     try {
@@ -47,8 +49,8 @@ export function useApi<T>() {
     }
   }, []);
 
-  return {
+  return React.useMemo(() => ({
     ...state,
     execute,
-  };
+  }), [state, execute]);
 } 

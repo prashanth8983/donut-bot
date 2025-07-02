@@ -23,7 +23,7 @@ export const UrlManager: React.FC = () => {
       if (response.success) {
         setQueueStatus(response.data || null);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to fetch queue status:', error);
     }
   };
@@ -51,8 +51,8 @@ export const UrlManager: React.FC = () => {
       } else {
         showNotification(`Failed to add URLs: ${response.error}`, 'error');
       }
-    } catch (error) {
-      showNotification('Failed to add URLs', 'error');
+    } catch (error: unknown) {
+      showNotification(`Failed to add URLs: ${(error as Error).message || String(error)}`, 'error');
     } finally {
       setAdding(false);
     }
@@ -72,8 +72,8 @@ export const UrlManager: React.FC = () => {
       } else {
         showNotification(`Failed to clear URLs: ${response.error}`, 'error');
       }
-    } catch (error) {
-      showNotification('Failed to clear URLs', 'error');
+    } catch (error: unknown) {
+      showNotification(`Failed to clear URLs: ${(error as Error).message || String(error)}`, 'error');
     } finally {
       setClearing(false);
     }

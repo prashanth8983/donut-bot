@@ -129,7 +129,7 @@ const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose, onSubm
               </label>
               <select
                 value={formData.priority}
-                onChange={(e) => setFormData({ ...formData, priority: e.target.value as any })}
+                onChange={(e) => setFormData({ ...formData, priority: e.target.value as 'high' | 'medium' | 'low' })}
                 className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                   isDarkMode 
                     ? 'border-stone-600 bg-stone-700 text-stone-100' 
@@ -296,13 +296,13 @@ export const Scheduler: React.FC = () => {
   const nextRunsApi = useApi<NextRunsResponse>();
   const { showNotification } = useDashboard();
 
-  const fetchScheduledJobs = async () => {
+  const fetchScheduledJobs = React.useCallback(async () => {
     await scheduledJobsApi.execute(() => apiService.getScheduledJobs());
-  };
+  }, [scheduledJobsApi]);
 
-  const fetchNextRuns = async () => {
+  const fetchNextRuns = React.useCallback(async () => {
     await nextRunsApi.execute(() => apiService.getNextRuns());
-  };
+  }, [nextRunsApi]);
 
   useEffect(() => {
     fetchScheduledJobs();
@@ -312,9 +312,9 @@ export const Scheduler: React.FC = () => {
       fetchNextRuns();
     }, 10000); // Refresh every 10 seconds
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchScheduledJobs, fetchNextRuns]);
 
-  const handleCreateJob = async (job: Omit<ScheduledJob, 'id' | 'createdAt' | 'updatedAt'>) => {
+  const handleCreateJob = React.useCallback(async (job: Omit<ScheduledJob, 'id' | 'createdAt' | 'updatedAt'>) => {
     const response = await apiService.createScheduledJob(job);
     if (response.success) {
       showNotification('Scheduled job created successfully', 'success');
@@ -322,9 +322,9 @@ export const Scheduler: React.FC = () => {
     } else {
       showNotification(`Failed to create scheduled job: ${response.error}`, 'error');
     }
-  };
+  }, [fetchScheduledJobs, showNotification]);
 
-  const handleEnableJob = async (id: string) => {
+  const handleEnableJob = React.useCallback(async (id: string) => {
     const response = await apiService.enableScheduledJob(id);
     if (response.success) {
       showNotification('Scheduled job enabled successfully', 'success');
@@ -332,9 +332,9 @@ export const Scheduler: React.FC = () => {
     } else {
       showNotification(`Failed to enable scheduled job: ${response.error}`, 'error');
     }
-  };
+  }, [fetchScheduledJobs, showNotification]);
 
-  const handleDisableJob = async (id: string) => {
+  const handleDisableJob = React.useCallback(async (id: string) => {
     const response = await apiService.disableScheduledJob(id);
     if (response.success) {
       showNotification('Scheduled job disabled successfully', 'success');
@@ -342,9 +342,9 @@ export const Scheduler: React.FC = () => {
     } else {
       showNotification(`Failed to disable scheduled job: ${response.error}`, 'error');
     }
-  };
+  }, [fetchScheduledJobs, showNotification]);
 
-  const handleDeleteJob = async (id: string) => {
+  const handleDeleteJob = React.useCallback(async (id: string) => {
     const response = await apiService.deleteScheduledJob(id);
     if (response.success) {
       showNotification('Scheduled job deleted successfully', 'success');
@@ -352,7 +352,7 @@ export const Scheduler: React.FC = () => {
     } else {
       showNotification(`Failed to delete scheduled job: ${response.error}`, 'error');
     }
-  };
+  }, [fetchScheduledJobs, showNotification]);
 
   const getStatusColor = (status: string) => {
     if (isDarkMode) {
