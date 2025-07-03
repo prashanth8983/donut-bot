@@ -4,8 +4,9 @@ Contains business logic for job operations.
 """
 
 from datetime import datetime, timezone
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 from bson import ObjectId
+from motor.motor_asyncio import AsyncIOMotorCollection
 
 from db.database import Database
 from db.schemas import JobCreate, JobUpdate, JobResponse, JobListResponse, JobStats
@@ -21,10 +22,21 @@ class JobService:
     
     def __init__(self, database: Database):
         self.database = database
-        self.collection = database.get_collection("jobs")
+        self.collection: Optional[AsyncIOMotorCollection] = None
+        try:
+            self.collection = database.get_collection("jobs")
+        except Exception as e:
+            logger.warning(f"Database collection not available: {e}")
+    
+    def _check_database(self):
+        """Check if database is available."""
+        if self.collection is None:
+            raise DatabaseError("Database not available")
     
     async def create_job(self, job_data: JobCreate) -> JobResponse:
         """Create a new crawl job."""
+        self._check_database()
+        
         try:
             # Check for duplicate job names if name is provided
             if hasattr(job_data, 'name') and job_data.name:
@@ -51,7 +63,8 @@ class JobService:
                 "avg_response_time": "0s",
                 "success_rate": 0.0,
                 "start_time": None,
-                "end_time": None
+                "end_time": None,
+                "elapsed_seconds": 0
             })
             
             # Insert into database
@@ -76,6 +89,10 @@ class JobService:
     
     async def get_job_by_id(self, job_id: str) -> Optional[JobResponse]:
         """Get a job by ID."""
+        if self.collection is None:
+            logger.warning("Database not available")
+            return None
+            
         try:
             if not job_id or not ObjectId.is_valid(job_id):
                 logger.warning(f"Invalid job ID format: {job_id}")
@@ -122,6 +139,7 @@ class JobService:
         size: int = 100
     ) -> JobListResponse:
         """Get jobs with optional filtering and pagination."""
+        self._check_database()
         try:
             # Validate pagination parameters
             if page < 1:
@@ -281,14 +299,18 @@ class JobService:
             elif job.status == "completed":
                 raise InvalidJobStateError(f"Cannot restart a completed job")
             
-            # Update job status
             now = datetime.now(timezone.utc)
             update_data = {
                 "status": "running",
                 "start_time": now,
+                "end_time": None,
                 "progress": 0.0,
                 "updated_at": now
             }
+            
+            # If job is queued, reset elapsed_seconds; if resuming, keep it
+            if job.status == "queued":
+                update_data["elapsed_seconds"] = 0
             
             result = await self.collection.update_one(
                 {"_id": ObjectId(job_id)},
@@ -318,23 +340,24 @@ class JobService:
             if job.status != "running":
                 raise InvalidJobStateError(f"Job is not running (current status: {job.status})")
             
-            # Update job status
             now = datetime.now(timezone.utc)
+            # Calculate elapsed_seconds
+            elapsed = job.elapsed_seconds or 0
+            if job.start_time:
+                elapsed += int((now - job.start_time).total_seconds())
             update_data = {
                 "status": "paused",
                 "end_time": now,
-                "updated_at": now
+                "updated_at": now,
+                "elapsed_seconds": elapsed
             }
-            
             result = await self.collection.update_one(
                 {"_id": ObjectId(job_id)},
                 {"$set": update_data}
             )
-            
             if result.modified_count > 0:
                 logger.info(f"Stopped job: {job.name} (ID: {job_id})")
                 return True
-            
             logger.warning(f"Failed to update job status for {job_id}")
             return False
             
@@ -359,23 +382,20 @@ class JobService:
             elif job.status != "paused":
                 raise InvalidJobStateError(f"Job is not paused (current status: {job.status})")
             
-            # Update job status
             now = datetime.now(timezone.utc)
             update_data = {
                 "status": "running",
                 "start_time": now,
+                "end_time": None,
                 "updated_at": now
             }
-            
             result = await self.collection.update_one(
                 {"_id": ObjectId(job_id)},
                 {"$set": update_data}
             )
-            
             if result.modified_count > 0:
                 logger.info(f"Resumed job: {job.name} (ID: {job_id})")
                 return True
-            
             logger.warning(f"Failed to update job status for {job_id}")
             return False
             
@@ -456,11 +476,15 @@ class JobService:
                 return True
             
             now = datetime.now(timezone.utc)
+            elapsed = job.elapsed_seconds or 0
+            if job.status == "running" and job.start_time:
+                elapsed += int((now - job.start_time).total_seconds())
             update_data = {
                 "status": "completed",
                 "end_time": now,
                 "updated_at": now,
-                "progress": 100.0
+                "progress": 100.0,
+                "elapsed_seconds": elapsed
             }
             
             # Add final statistics if provided
