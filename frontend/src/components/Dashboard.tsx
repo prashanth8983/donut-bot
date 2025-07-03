@@ -88,16 +88,16 @@ export const Dashboard: React.FC = () => {
 
       if (metrics.content_type_counts) {
         const newContentTypeData = Object.entries(metrics.content_type_counts).map(([name, value]) => ({
-          name: name,
-          value: value,
+          name,
+          value,
         }));
         setContentTypeData(newContentTypeData);
       }
 
       if (metrics.status_code_counts) {
         const newStatusCodeData = Object.entries(metrics.status_code_counts).map(([name, value]) => ({
-          name: name,
-          value: value,
+          name,
+          value,
         }));
         setStatusCodeData(newStatusCodeData);
       }
@@ -206,12 +206,12 @@ export const Dashboard: React.FC = () => {
             </div>
             {/* Processing */}
             <div className={`${isDarkMode ? 'bg-yellow-900/50' : 'bg-yellow-50'} rounded-lg p-4 flex flex-col items-center`}>
-              <div className={`text-3xl font-bold ${isDarkMode ? 'text-yellow-300' : 'text-yellow-600'}`}>{typeof queueStatus?.processing_urls === 'number' ? queueStatus.processing_urls.toLocaleString() : '0'}</div>
+                              <div className={`text-3xl font-bold ${isDarkMode ? 'text-yellow-300' : 'text-yellow-600'}`}>{typeof queueStatus?.processing_count === 'number' ? queueStatus.processing_count.toLocaleString() : '0'}</div>
               <div className={`text-sm mt-2 ${isDarkMode ? 'text-yellow-200' : 'text-yellow-700'}`}>Processing</div>
             </div>
             {/* Completed */}
             <div className={`${isDarkMode ? 'bg-green-900/50' : 'bg-green-50'} rounded-lg p-4 flex flex-col items-center`}>
-              <div className={`text-3xl font-bold ${isDarkMode ? 'text-green-300' : 'text-green-600'}`}>{typeof queueStatus?.completed_urls === 'number' ? queueStatus.completed_urls.toLocaleString() : '0'}</div>
+                              <div className={`text-3xl font-bold ${isDarkMode ? 'text-green-300' : 'text-green-600'}`}>{typeof queueStatus?.completed_count === 'number' ? queueStatus.completed_count.toLocaleString() : '0'}</div>
               <div className={`text-sm mt-2 ${isDarkMode ? 'text-green-200' : 'text-green-700'}`}>Completed</div>
             </div>
             {/* Errors */}
@@ -238,7 +238,7 @@ export const Dashboard: React.FC = () => {
                 dataKey="value"
                 nameKey="name"
               >
-                {contentTypeData.map((entry, index) => (
+                {contentTypeData.map((_, index) => (
                   <Cell key={`cell-content-${index}`} fill={['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF'][index % 5]} />
                 ))}
               </Pie>
@@ -268,7 +268,7 @@ export const Dashboard: React.FC = () => {
                 dataKey="value"
                 nameKey="name"
               >
-                {statusCodeData.map((entry, index) => (
+                {statusCodeData.map((_, index) => (
                   <Cell key={`cell-status-${index}`} fill={['#00C49F', '#FFBB28', '#FF8042', '#AF19FF', '#0088FE'][index % 5]} />
                 ))}
               </Pie>

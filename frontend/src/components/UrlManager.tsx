@@ -147,21 +147,21 @@ export const UrlManager: React.FC = () => {
             
             <div className={`${isDarkMode ? 'bg-yellow-900/50' : 'bg-yellow-50'} rounded-lg p-4`}>
               <div className={`text-2xl font-bold ${isDarkMode ? 'text-yellow-300' : 'text-yellow-600'}`}>
-                {typeof queueStatus.processing_urls === 'number' ? queueStatus.processing_urls.toLocaleString() : '0'}
+                {typeof queueStatus.processing_count === 'number' ? queueStatus.processing_count.toLocaleString() : '0'}
               </div>
               <div className={`text-sm ${isDarkMode ? 'text-yellow-200' : 'text-yellow-700'}`}>Processing</div>
             </div>
             
             <div className={`${isDarkMode ? 'bg-green-900/50' : 'bg-green-50'} rounded-lg p-4`}>
               <div className={`text-2xl font-bold ${isDarkMode ? 'text-green-300' : 'text-green-600'}`}>
-                {typeof queueStatus.completed_urls === 'number' ? queueStatus.completed_urls.toLocaleString() : '0'}
+                {typeof queueStatus.completed_count === 'number' ? queueStatus.completed_count.toLocaleString() : '0'}
               </div>
               <div className={`text-sm ${isDarkMode ? 'text-green-200' : 'text-green-700'}`}>Completed</div>
             </div>
             
             <div className={`${isDarkMode ? 'bg-stone-700' : 'bg-gray-50'} rounded-lg p-4`}>
               <div className={`text-2xl font-bold ${isDarkMode ? 'text-stone-300' : 'text-gray-600'}`}>
-                {typeof queueStatus.seen_urls === 'number' ? queueStatus.seen_urls.toLocaleString() : '0'}
+                {typeof queueStatus.seen_count === 'number' ? queueStatus.seen_count.toLocaleString() : '0'}
               </div>
               <div className={`text-sm ${isDarkMode ? 'text-stone-400' : 'text-gray-700'}`}>Seen</div>
             </div>
