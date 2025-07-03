@@ -18,12 +18,6 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ isOpen, 
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'basic' | 'advanced' | 'domains'>('basic');
 
-  useEffect(() => {
-    if (isOpen) {
-      fetchConfiguration();
-    }
-  }, [isOpen, fetchConfiguration]);
-
   const fetchConfiguration = React.useCallback(async () => {
     setLoading(true);
     try {
@@ -45,6 +39,12 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ isOpen, 
       setLoading(false);
     }
   }, [showNotification]);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchConfiguration();
+    }
+  }, [isOpen, fetchConfiguration]);
 
   const handleSaveConfig = async () => {
     setSaving(true);
@@ -222,7 +222,7 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ isOpen, 
 
                     <div>
                       <label className={`block text-sm font-medium ${isDarkMode ? 'text-stone-300' : 'text-gray-700'} mb-2`}>
-                        Request Delay (seconds)
+                        Delay (seconds)
                       </label>
                       <input
                         type="number"
@@ -241,7 +241,7 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ isOpen, 
 
                     <div>
                       <label className={`block text-sm font-medium ${isDarkMode ? 'text-stone-300' : 'text-gray-700'} mb-2`}>
-                        Request Timeout (seconds)
+                        Timeout (seconds)
                       </label>
                       <input
                         type="number"
@@ -254,7 +254,7 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ isOpen, 
                             : 'border-gray-300 bg-white text-gray-900'
                         }`}
                       />
-                      <p className={`text-xs ${isDarkMode ? 'text-stone-500' : 'text-gray-500'} mt-1`}>Request timeout in seconds</p>
+                      <p className={`text-xs ${isDarkMode ? 'text-stone-500' : 'text-gray-500'} mt-1`}>Request timeout</p>
                     </div>
 
                     <div>
@@ -270,10 +270,21 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ isOpen, 
                             ? 'border-stone-600 bg-stone-700 text-stone-100' 
                             : 'border-gray-300 bg-white text-gray-900'
                         }`}
-                        placeholder="Mozilla/5.0 (Windows NT 10.0; Win64; x64)..."
+                        placeholder="Mozilla/5.0 (compatible; WebCrawler/1.0)"
                       />
                       <p className={`text-xs ${isDarkMode ? 'text-stone-500' : 'text-gray-500'} mt-1`}>Custom user agent string</p>
                     </div>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <button
+                      onClick={handleSaveConfig}
+                      disabled={saving}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                    >
+                      <Save className="w-4 h-4" />
+                      {saving ? 'Saving...' : 'Save Configuration'}
+                    </button>
                   </div>
                 </div>
               )}
@@ -284,10 +295,10 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ isOpen, 
                   <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                     <div className="flex items-center gap-2 mb-2">
                       <AlertCircle className="w-5 h-5 text-yellow-600" />
-                      <span className="text-sm font-medium text-yellow-800">Advanced Settings</span>
+                      <h3 className="text-lg font-medium text-yellow-800">Advanced Settings</h3>
                     </div>
                     <p className="text-sm text-yellow-700">
-                      These settings affect crawler performance and behavior. Modify with caution.
+                      These settings are for advanced users. Modify with caution as they can significantly impact crawler performance and behavior.
                     </p>
                   </div>
 
@@ -299,8 +310,7 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ isOpen, 
                       <input
                         type="number"
                         min="1000"
-                        step="1000"
-                        value={config.bloom_capacity || 10000000}
+                        value={config.bloom_capacity || 100000}
                         onChange={(e) => updateConfig('bloom_capacity', parseInt(e.target.value))}
                         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                           isDarkMode 
@@ -308,7 +318,7 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ isOpen, 
                             : 'border-gray-300 bg-white text-gray-900'
                         }`}
                       />
-                      <p className={`text-xs ${isDarkMode ? 'text-stone-500' : 'text-gray-500'} mt-1`}>Maximum URLs to track (default: 10M)</p>
+                      <p className={`text-xs ${isDarkMode ? 'text-stone-500' : 'text-gray-500'} mt-1`}>Bloom filter capacity for URL deduplication</p>
                     </div>
 
                     <div>
@@ -320,7 +330,7 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ isOpen, 
                         min="0.001"
                         max="0.1"
                         step="0.001"
-                        value={config.bloom_error_rate || 0.001}
+                        value={config.bloom_error_rate || 0.01}
                         onChange={(e) => updateConfig('bloom_error_rate', parseFloat(e.target.value))}
                         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                           isDarkMode 
@@ -328,7 +338,7 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ isOpen, 
                             : 'border-gray-300 bg-white text-gray-900'
                         }`}
                       />
-                      <p className={`text-xs ${isDarkMode ? 'text-stone-500' : 'text-gray-500'} mt-1`}>False positive rate (0.001-0.1)</p>
+                      <p className={`text-xs ${isDarkMode ? 'text-stone-500' : 'text-gray-500'} mt-1`}>Bloom filter false positive rate (0.001-0.1)</p>
                     </div>
 
                     <div>
@@ -337,8 +347,8 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ isOpen, 
                       </label>
                       <input
                         type="number"
-                        min="1"
-                        value={config.idle_shutdown_threshold || 3}
+                        min="10"
+                        value={config.idle_shutdown_threshold || 300}
                         onChange={(e) => updateConfig('idle_shutdown_threshold', parseInt(e.target.value))}
                         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                           isDarkMode 
@@ -346,16 +356,16 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ isOpen, 
                             : 'border-gray-300 bg-white text-gray-900'
                         }`}
                       />
-                      <p className={`text-xs ${isDarkMode ? 'text-stone-500' : 'text-gray-500'} mt-1`}>Minutes of inactivity before shutdown</p>
+                      <p className={`text-xs ${isDarkMode ? 'text-stone-500' : 'text-gray-500'} mt-1`}>Seconds of inactivity before auto-shutdown</p>
                     </div>
 
                     <div>
                       <label className={`block text-sm font-medium ${isDarkMode ? 'text-stone-300' : 'text-gray-700'} mb-2`}>
-                        Metrics Interval (seconds)
+                        Metrics Interval
                       </label>
                       <input
                         type="number"
-                        min="10"
+                        min="1"
                         value={config.metrics_interval || 60}
                         onChange={(e) => updateConfig('metrics_interval', parseInt(e.target.value))}
                         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
@@ -364,8 +374,56 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ isOpen, 
                             : 'border-gray-300 bg-white text-gray-900'
                         }`}
                       />
-                      <p className={`text-xs ${isDarkMode ? 'text-stone-500' : 'text-gray-500'} mt-1`}>How often to collect metrics</p>
+                      <p className={`text-xs ${isDarkMode ? 'text-stone-500' : 'text-gray-500'} mt-1`}>Seconds between metrics updates</p>
                     </div>
+
+                    <div>
+                      <label className={`block text-sm font-medium ${isDarkMode ? 'text-stone-300' : 'text-gray-700'} mb-2`}>
+                        Request Timeout
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={config.request_timeout || 30}
+                        onChange={(e) => updateConfig('request_timeout', parseInt(e.target.value))}
+                        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                          isDarkMode 
+                            ? 'border-stone-600 bg-stone-700 text-stone-100' 
+                            : 'border-gray-300 bg-white text-gray-900'
+                        }`}
+                      />
+                      <p className={`text-xs ${isDarkMode ? 'text-stone-500' : 'text-gray-500'} mt-1`}>HTTP request timeout in seconds</p>
+                    </div>
+
+                    <div>
+                      <label className={`block text-sm font-medium ${isDarkMode ? 'text-stone-300' : 'text-gray-700'} mb-2`}>
+                        Max Connections
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={config.max_connections || 10}
+                        onChange={(e) => updateConfig('max_connections', parseInt(e.target.value))}
+                        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                          isDarkMode 
+                            ? 'border-stone-600 bg-stone-700 text-stone-100' 
+                            : 'border-gray-300 bg-white text-gray-900'
+                        }`}
+                      />
+                      <p className={`text-xs ${isDarkMode ? 'text-stone-500' : 'text-gray-500'} mt-1`}>Maximum concurrent connections</p>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <button
+                      onClick={handleSaveConfig}
+                      disabled={saving}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                    >
+                      <Save className="w-4 h-4" />
+                      {saving ? 'Saving...' : 'Save Configuration'}
+                    </button>
                   </div>
                 </div>
               )}
@@ -376,93 +434,69 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({ isOpen, 
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <div className="flex items-center gap-2 mb-2">
                       <CheckCircle className="w-5 h-5 text-blue-600" />
-                      <span className="text-sm font-medium text-blue-800">Domain Management</span>
+                      <h3 className="text-lg font-medium text-blue-800">Domain Management</h3>
                     </div>
                     <p className="text-sm text-blue-700">
-                      Manage allowed domains for crawling. Only URLs from these domains will be processed.
+                      Manage allowed domains for crawling. Only URLs from these domains will be crawled.
                     </p>
                   </div>
 
-                  {/* Add Domain */}
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={newDomain}
-                      onChange={(e) => setNewDomain(e.target.value)}
-                      placeholder="Enter domain (e.g., example.com)"
-                      className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                        isDarkMode 
-                          ? 'border-stone-600 bg-stone-700 text-stone-100' 
-                          : 'border-gray-300 bg-white text-gray-900'
-                      }`}
-                      onKeyPress={(e) => e.key === 'Enter' && handleAddDomain()}
-                    />
-                    <button
-                      onClick={handleAddDomain}
-                      disabled={!newDomain.trim()}
-                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Plus className="w-4 h-4" />
-                      Add
-                    </button>
-                  </div>
-
-                  {/* Domain List */}
-                  <div className="space-y-2">
-                    <h3 className={`text-sm font-medium ${isDarkMode ? 'text-stone-300' : 'text-gray-700'}`}>Allowed Domains ({allowedDomains.length})</h3>
-                    {allowedDomains.length === 0 ? (
-                      <p className={`text-sm ${isDarkMode ? 'text-stone-500' : 'text-gray-500'} italic`}>No domains configured</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {allowedDomains.map((domain, index) => (
-                          <div
-                            key={index}
-                            className={`flex items-center justify-between p-3 ${isDarkMode ? 'bg-stone-700' : 'bg-gray-50'} rounded-md`}
-                          >
-                            <span className={`text-sm font-medium ${isDarkMode ? 'text-stone-100' : 'text-gray-900'}`}>{domain}</span>
-                            <button
-                              onClick={() => handleRemoveDomain(domain)}
-                              className={`flex items-center gap-1 px-2 py-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors ${
-                                isDarkMode ? 'text-stone-400 hover:text-stone-200' : 'text-gray-400 hover:text-gray-600'
-                              }`}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                              Remove
-                            </button>
-                          </div>
-                        ))}
+                  <div className="space-y-4">
+                    <div>
+                      <label className={`block text-sm font-medium ${isDarkMode ? 'text-stone-300' : 'text-gray-700'} mb-2`}>
+                        Add New Domain
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={newDomain}
+                          onChange={(e) => setNewDomain(e.target.value)}
+                          placeholder="example.com"
+                          className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                            isDarkMode 
+                              ? 'border-stone-600 bg-stone-700 text-stone-100' 
+                              : 'border-gray-300 bg-white text-gray-900'
+                          }`}
+                        />
+                        <button
+                          onClick={handleAddDomain}
+                          disabled={!newDomain.trim()}
+                          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Add
+                        </button>
                       </div>
-                    )}
+                    </div>
+
+                    <div>
+                      <label className={`block text-sm font-medium ${isDarkMode ? 'text-stone-300' : 'text-gray-700'} mb-2`}>
+                        Allowed Domains ({allowedDomains.length})
+                      </label>
+                      <div className="space-y-2">
+                        {allowedDomains.length === 0 ? (
+                          <p className={`text-sm ${isDarkMode ? 'text-stone-400' : 'text-gray-500'}`}>No domains configured</p>
+                        ) : (
+                          allowedDomains.map((domain, index) => (
+                            <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                              <span className={`font-medium ${isDarkMode ? 'text-stone-200' : 'text-gray-900'}`}>{domain}</span>
+                              <button
+                                onClick={() => handleRemoveDomain(domain)}
+                                className="flex items-center gap-1 px-2 py-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                                Remove
+                              </button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
             </>
           )}
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
-          <div className="text-sm text-gray-600">
-            {activeTab === 'basic' && 'Configure basic crawler settings'}
-            {activeTab === 'advanced' && 'Advanced performance and behavior settings'}
-            {activeTab === 'domains' && 'Manage allowed domains for crawling'}
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={onClose}
-              className={`px-4 py-2 ${isDarkMode ? 'text-stone-400 hover:text-stone-200' : 'text-gray-600 hover:text-gray-800'} transition-colors`}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSaveConfig}
-              disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
-            >
-              <Save className="w-4 h-4" />
-              {saving ? 'Saving...' : 'Save Configuration'}
-            </button>
-          </div>
         </div>
       </div>
     </div>
