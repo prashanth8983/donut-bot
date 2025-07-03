@@ -8,7 +8,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 
 from db.schemas import ScheduledJobCreate, ScheduledJobUpdate, ScheduledJobResponse, ScheduledJobListResponse, NextRunsResponse
-from services.scheduler_service import get_scheduler_service, SchedulerService
+from services.scheduler_service import SchedulerService
+from api.deps import get_scheduler_service
 from exceptions import JobNotFoundError, DatabaseError
 from core.logger import get_logger
 

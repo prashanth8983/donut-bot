@@ -272,6 +272,39 @@ async def resume_job(
         )
 
 
+@router.post("/{job_id}/pause", status_code=status.HTTP_200_OK)
+async def pause_job(
+    job_id: str,
+    job_service: JobService = Depends(get_job_service)
+):
+    """Pause a running job."""
+    try:
+        success = await job_service.pause_job(job_id)
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Job not found: {job_id}"
+            )
+        logger.info(f"Paused job: {job_id}")
+        return {"message": "Job paused successfully"}
+    except JobNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Job not found: {job_id}"
+        )
+    except InvalidJobStateError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Error pausing job {job_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+
+
 @router.get("/stats/overview", response_model=JobStats)
 async def get_job_stats(
     job_service: JobService = Depends(get_job_service)
