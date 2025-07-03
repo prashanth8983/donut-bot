@@ -26,6 +26,7 @@ export const Jobs: React.FC<JobsProps> = React.memo(({ onRefresh }) => {
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [selectedJob, setSelectedJob] = useState<CrawlJob | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<Set<string>>(new Set());
 
   const jobsApi = useApi<JobsApiResponse>();
   const createJobApi = useApi<CrawlJob>();
@@ -68,25 +69,42 @@ export const Jobs: React.FC<JobsProps> = React.memo(({ onRefresh }) => {
   }, [createJobApi, fetchJobs]);
 
   const handleJobAction = React.useCallback(async (jobId: string, action: 'start' | 'stop' | 'pause' | 'resume') => {
-    let apiCall;
-    switch (action) {
-      case 'start':
-        apiCall = () => apiService.startJob(jobId);
-        break;
-      case 'stop':
-        apiCall = () => apiService.stopJob(jobId);
-        break;
-      case 'pause':
-        apiCall = () => apiService.pauseJob(jobId);
-        break;
-      case 'resume':
-        apiCall = () => apiService.resumeJob(jobId);
-        break;
-    }
+    // Add job to loading set
+    setActionLoading(prev => new Set(prev).add(jobId));
     
-    if (apiCall) {
-      await apiCall();
-      fetchJobs(); // Refresh the jobs list
+    try {
+      let apiCall;
+      switch (action) {
+        case 'start':
+          apiCall = () => apiService.startJob(jobId);
+          break;
+        case 'stop':
+          apiCall = () => apiService.stopJob(jobId);
+          break;
+        case 'pause':
+          apiCall = () => apiService.pauseJob(jobId);
+          break;
+        case 'resume':
+          apiCall = () => apiService.resumeJob(jobId);
+          break;
+      }
+      
+      if (apiCall) {
+        await apiCall();
+        // Small delay to ensure backend has processed the change
+        setTimeout(() => {
+          fetchJobs();
+        }, 500);
+      }
+    } catch (error) {
+      console.error(`Failed to ${action} job:`, error);
+    } finally {
+      // Remove job from loading set
+      setActionLoading(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(jobId);
+        return newSet;
+      });
     }
   }, [fetchJobs]);
 
@@ -235,18 +253,23 @@ export const Jobs: React.FC<JobsProps> = React.memo(({ onRefresh }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredJobs.map((job, idx) => (
-                    <JobRow
-                      key={job.id}
-                      job={job}
-                      isDarkMode={isDarkMode}
-                      idx={idx}
-                      deleting={deleting}
-                      onJobAction={handleJobAction}
-                      onSetDeleteJobId={setDeleteJobId}
-                      onSetSelectedJob={setSelectedJob}
-                    />
-                  ))}
+                  {filteredJobs.map((job, idx) => {
+                    console.log('Jobs Debug:', job.name, job.status, job.start_time, job.end_time, currentTime);
+                    return (
+                      <JobRow
+                        key={job.id}
+                        job={job}
+                        isDarkMode={isDarkMode}
+                        idx={idx}
+                        deleting={deleting && deleteJobId === job.id}
+                        onJobAction={handleJobAction}
+                        onSetDeleteJobId={setDeleteJobId}
+                        onSetSelectedJob={setSelectedJob}
+                        currentTime={currentTime}
+                        actionLoading={actionLoading.has(job.id)}
+                      />
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -311,14 +334,14 @@ export const Jobs: React.FC<JobsProps> = React.memo(({ onRefresh }) => {
                 <div><span className="font-semibold">Domain:</span> {selectedJob.domain}</div>
                 <div><span className="font-semibold">Status:</span> {selectedJob.status}</div>
                 <div><span className="font-semibold">Priority:</span> {selectedJob.priority}</div>
-                <div><span className="font-semibold">Category:</span> {selectedJob.category}</div>
+                <div><span className="font-semibold">Description:</span> {selectedJob.description}</div>
                 <div><span className="font-semibold">Elapsed:</span> {(() => {
                   let elapsed = '-';
-                  if (selectedJob.startTime) {
-                    const start = new Date(selectedJob.startTime).getTime();
+                  if (selectedJob.start_time) {
+                    const start = new Date(selectedJob.start_time).getTime();
                     let end = currentTime;
-                    if (selectedJob.status === 'completed' && selectedJob.estimatedEnd) {
-                      end = new Date(selectedJob.estimatedEnd).getTime();
+                    if (selectedJob.status === 'completed' && selectedJob.end_time) {
+                      end = new Date(selectedJob.end_time).getTime();
                     }
                     const diff = Math.max(0, Math.floor((end - start) / 1000));
                     const h = Math.floor(diff / 3600);
@@ -328,17 +351,17 @@ export const Jobs: React.FC<JobsProps> = React.memo(({ onRefresh }) => {
                   }
                   return elapsed;
                 })()}</div>
-                <div><span className="font-semibold">Pages Crawled:</span> {selectedJob.pagesFound}</div>
+                <div><span className="font-semibold">Pages Crawled:</span> {selectedJob.pages_found}</div>
                 <div><span className="font-semibold">Errors:</span> {selectedJob.errors}</div>
                 <div><span className="font-semibold">Progress:</span> {selectedJob.progress.toFixed(1)}%</div>
-                <div><span className="font-semibold">Data Size:</span> {selectedJob.dataSize}</div>
-                <div><span className="font-semibold">Avg Response Time:</span> {selectedJob.avgResponseTime}</div>
-                <div><span className="font-semibold">Success Rate:</span> {selectedJob.successRate}%</div>
-                <div><span className="font-semibold">Start Time:</span> {selectedJob.startTime ? new Date(selectedJob.startTime).toLocaleString() : '-'}</div>
-                <div><span className="font-semibold">End Time:</span> {selectedJob.estimatedEnd ? new Date(selectedJob.estimatedEnd).toLocaleString() : '-'}</div>
-                <div><span className="font-semibold">Max Pages:</span> {selectedJob.config?.max_pages ?? '-'}</div>
-                <div><span className="font-semibold">Max Depth:</span> {selectedJob.config?.max_depth ?? '-'}</div>
-                <div><span className="font-semibold">Allowed Domains:</span> {selectedJob.config?.allowed_domains?.join(', ') ?? '-'}</div>
+                <div><span className="font-semibold">Data Size:</span> {selectedJob.data_size}</div>
+                <div><span className="font-semibold">Avg Response Time:</span> {selectedJob.avg_response_time}</div>
+                <div><span className="font-semibold">Success Rate:</span> {selectedJob.success_rate}%</div>
+                <div><span className="font-semibold">Start Time:</span> {selectedJob.start_time ? new Date(selectedJob.start_time).toLocaleString() : '-'}</div>
+                <div><span className="font-semibold">End Time:</span> {selectedJob.end_time ? new Date(selectedJob.end_time).toLocaleString() : '-'}</div>
+                <div><span className="font-semibold">Max Pages:</span> {selectedJob.max_pages ?? '-'}</div>
+                <div><span className="font-semibold">Max Depth:</span> {selectedJob.max_depth ?? '-'}</div>
+                <div><span className="font-semibold">Tags:</span> {selectedJob.tags?.join(', ') ?? '-'}</div>
               </div>
               <div className="mt-6 flex justify-end">
                 <button onClick={() => setSelectedJob(null)} className={`px-4 py-2 rounded-lg ${isDarkMode ? 'bg-stone-700 text-stone-100 hover:bg-stone-600' : 'bg-gray-200 text-gray-900 hover:bg-gray-300'}`}>Close</button>
@@ -388,20 +411,20 @@ const CreateJobModal: React.FC<CreateJobModalProps> = ({ onClose, onSubmit, load
       ...formData,
       status: 'queued',
       progress: 0,
-      pagesFound: 0,
+      pages_found: 0,
       errors: 0,
-      startTime: '',
-      estimatedEnd: '',
+      start_time: null,
+      end_time: null,
       scheduled: false,
-      dataSize: '0 MB',
-      avgResponseTime: '0s',
-      successRate: 0,
-      config: {
-        workers: formData.workers,
-        max_depth: formData.depth,
-        max_pages: formData.max_pages,
-        allowed_domains: [formData.domain],
-      },
+      data_size: '0 MB',
+      avg_response_time: '0s',
+      success_rate: 0,
+      description: formData.category,
+      tags: [],
+      max_depth: formData.depth,
+      max_pages: formData.max_pages,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     });
   };
 
