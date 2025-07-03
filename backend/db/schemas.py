@@ -65,6 +65,7 @@ class JobBase(MongoBaseModel):
     max_depth: Optional[int] = Field(default=3, ge=1, description="Maximum crawl depth")
     description: Optional[str] = Field(default="", max_length=500, description="Job description")
     tags: Optional[List[str]] = Field(default_factory=list, description="Job tags")
+    elapsed_seconds: int = Field(default=0, ge=0, description="Total elapsed time in seconds across all runs")
     
     @field_validator('priority')
     @classmethod
@@ -106,6 +107,7 @@ class JobUpdate(MongoBaseModel):
     data_size: Optional[str] = Field(None)
     avg_response_time: Optional[str] = Field(None)
     success_rate: Optional[float] = Field(None, ge=0.0, le=100.0)
+    elapsed_seconds: Optional[int] = Field(None, ge=0, description="Total elapsed time in seconds across all runs")
     
     @field_validator('priority')
     @classmethod
@@ -139,6 +141,7 @@ class JobResponse(JobBase):
     data_size: str = Field(default="0 MB", description="Amount of data crawled")
     avg_response_time: str = Field(default="0s", description="Average response time")
     success_rate: float = Field(default=0.0, ge=0.0, le=100.0, description="Success rate percentage")
+    elapsed_seconds: int = Field(default=0, ge=0, description="Total elapsed time in seconds across all runs")
     
     # Timestamps
     created_at: datetime = Field(description="Creation timestamp")
