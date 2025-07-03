@@ -1,6 +1,13 @@
 import { createContext, useState, useContext, type ReactNode } from 'react';
 import { menuItems } from '../constants/menuItems';
 
+interface MenuItem {
+  id: string;
+  title: string;
+  path: string;
+  icon: string;
+}
+
 export interface Notification {
     id: string;
     message: string;

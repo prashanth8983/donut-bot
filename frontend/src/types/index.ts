@@ -57,27 +57,29 @@ export interface CrawlJob {
   domain: string;
   status: 'running' | 'completed' | 'paused' | 'failed' | 'queued';
   progress: number;
-  pagesFound: number;
+  pages_found: number;
   errors: number;
-  startTime: string;
-  estimatedEnd: string;
-  depth: number;
+  start_time: string | null;
+  end_time: string | null;
+  max_depth: number;
+  max_pages: number;
   scheduled: boolean;
   priority: 'high' | 'medium' | 'low';
-  category: string;
-  dataSize: string;
-  avgResponseTime: string;
-  successRate: number;
-  config: CrawlerConfig;
-  urls: string[];
+  description: string;
+  tags: string[];
+  data_size: string;
+  avg_response_time: string;
+  success_rate: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface QueueStatus {
   queue_size: number;
-  processing_urls: number;
-  completed_urls: number;
-  seen_urls: number;
-  redis_connected: boolean;
+  processing_count: number;
+  completed_count: number;
+  seen_count: number;
+  redis_connected?: boolean;
 }
 
 export interface Metrics {
