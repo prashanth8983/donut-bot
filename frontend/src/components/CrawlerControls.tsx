@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Play, Square, RotateCcw, AlertTriangle, Settings, Activity, Clock, Zap } from 'lucide-react';
+import { Play, Square, RotateCcw, Settings, Activity, Clock, Zap } from 'lucide-react';
 import { apiService } from '../services/api';
 import type { CrawlerStatus } from '../types';
 import { useDashboard } from '../contexts/DashboardContext';
@@ -43,7 +43,7 @@ export const CrawlerControls: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
-  const handleAction = React.useCallback(async (action: string, apiCall: () => Promise<ApiResponse<unknown>>) => {
+  const handleAction = React.useCallback(async (action: string, apiCall: () => Promise<any>) => {
     setActionLoading(action);
     try {
       const response = await apiCall();
@@ -171,14 +171,6 @@ export const CrawlerControls: React.FC = () => {
         >
           <RotateCcw className="w-4 h-4" />
           {actionLoading === 'reset' ? 'Resetting...' : 'Reset All'}
-        </button>
-        <button
-          onClick={handleReset}
-          disabled={actionLoading !== null}
-          className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <AlertTriangle className="w-4 h-4" />
-          Emergency Stop & Reset
         </button>
 
       </div>

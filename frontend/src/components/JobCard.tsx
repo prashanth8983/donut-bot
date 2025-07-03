@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Square, Pause,  Clock, Globe, BarChart3 } from 'lucide-react';
+import { Play, Square, Clock, Globe, BarChart3 } from 'lucide-react';
 import type { CrawlJob } from '../types';
 import { useDashboard } from '../contexts/DashboardContext';
 
@@ -90,15 +90,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onAction }) => {
           </div>
         </div>
         <div className="flex items-center gap-1">
-          {job.status === 'running' && (
-            <button
-              onClick={() => onAction('pause')}
-              className={`p-2 text-yellow-600 ${isDarkMode ? 'hover:bg-yellow-900/50' : 'hover:bg-yellow-50'} rounded-lg transition-colors`}
-              title="Pause"
-            >
-              <Pause className="w-4 h-4" />
-            </button>
-          )}
+          
           {job.status === 'paused' && (
             <button
               onClick={() => onAction('resume')}
@@ -145,7 +137,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onAction }) => {
           <div className="flex items-center gap-2">
             <BarChart3 className={`w-4 h-4 ${isDarkMode ? 'text-stone-400' : 'text-gray-400'}`} />
             <span className={isDarkMode ? 'text-stone-400' : 'text-gray-600'}>Pages:</span>
-            <span className={`font-medium ${isDarkMode ? 'text-stone-200' : 'text-gray-900'}`}>{job.pagesFound}</span>
+                            <span className={`font-medium ${isDarkMode ? 'text-stone-200' : 'text-gray-900'}`}>{job.pages_found}</span>
           </div>
           <div className="flex items-center gap-2">
             <Clock className={`w-4 h-4 ${isDarkMode ? 'text-stone-400' : 'text-gray-400'}`} />
@@ -155,7 +147,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onAction }) => {
         </div>
 
         <div className={`text-xs ${isDarkMode ? 'text-stone-500' : 'text-gray-500'}`}>
-          Started: {job.startTime ? new Date(job.startTime).toLocaleString() : '-'}
+          Started: {job.start_time ? new Date(job.start_time).toLocaleString() : '-'}
         </div>
       </div>
     </div>

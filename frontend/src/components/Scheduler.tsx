@@ -27,7 +27,7 @@ const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose, onSubm
     name: '',
     domain: '',
     schedule: '0 2 * * *', // Daily at 2 AM
-    priority: 'medium' as const,
+    priority: 'medium' as 'low' | 'medium' | 'high',
     category: 'General',
     urls: [''],
     config: {
@@ -129,7 +129,7 @@ const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose, onSubm
               </label>
               <select
                 value={formData.priority}
-                onChange={(e) => setFormData({ ...formData, priority: e.target.value as 'high' | 'medium' | 'low' })}
+                onChange={(e) => setFormData({ ...formData, priority: e.target.value as 'low' | 'medium' | 'high' })}
                 className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                   isDarkMode 
                     ? 'border-stone-600 bg-stone-700 text-stone-100' 
@@ -298,11 +298,11 @@ export const Scheduler: React.FC = () => {
 
   const fetchScheduledJobs = React.useCallback(async () => {
     await scheduledJobsApi.execute(() => apiService.getScheduledJobs());
-  }, [scheduledJobsApi]);
+  }, []);
 
   const fetchNextRuns = React.useCallback(async () => {
     await nextRunsApi.execute(() => apiService.getNextRuns());
-  }, [nextRunsApi]);
+  }, []);
 
   useEffect(() => {
     fetchScheduledJobs();
@@ -312,47 +312,47 @@ export const Scheduler: React.FC = () => {
       fetchNextRuns();
     }, 10000); // Refresh every 10 seconds
     return () => clearInterval(interval);
-  }, [fetchScheduledJobs, fetchNextRuns]);
+  }, []); // Only run once on mount
 
   const handleCreateJob = React.useCallback(async (job: Omit<ScheduledJob, 'id' | 'createdAt' | 'updatedAt'>) => {
     const response = await apiService.createScheduledJob(job);
     if (response.success) {
       showNotification('Scheduled job created successfully', 'success');
-      fetchScheduledJobs();
+      scheduledJobsApi.execute(() => apiService.getScheduledJobs());
     } else {
       showNotification(`Failed to create scheduled job: ${response.error}`, 'error');
     }
-  }, [fetchScheduledJobs, showNotification]);
+  }, [scheduledJobsApi, showNotification]);
 
   const handleEnableJob = React.useCallback(async (id: string) => {
     const response = await apiService.enableScheduledJob(id);
     if (response.success) {
       showNotification('Scheduled job enabled successfully', 'success');
-      fetchScheduledJobs();
+      scheduledJobsApi.execute(() => apiService.getScheduledJobs());
     } else {
       showNotification(`Failed to enable scheduled job: ${response.error}`, 'error');
     }
-  }, [fetchScheduledJobs, showNotification]);
+  }, [scheduledJobsApi, showNotification]);
 
   const handleDisableJob = React.useCallback(async (id: string) => {
     const response = await apiService.disableScheduledJob(id);
     if (response.success) {
       showNotification('Scheduled job disabled successfully', 'success');
-      fetchScheduledJobs();
+      scheduledJobsApi.execute(() => apiService.getScheduledJobs());
     } else {
       showNotification(`Failed to disable scheduled job: ${response.error}`, 'error');
     }
-  }, [fetchScheduledJobs, showNotification]);
+  }, [scheduledJobsApi, showNotification]);
 
   const handleDeleteJob = React.useCallback(async (id: string) => {
     const response = await apiService.deleteScheduledJob(id);
     if (response.success) {
       showNotification('Scheduled job deleted successfully', 'success');
-      fetchScheduledJobs();
+      scheduledJobsApi.execute(() => apiService.getScheduledJobs());
     } else {
       showNotification(`Failed to delete scheduled job: ${response.error}`, 'error');
     }
-  }, [fetchScheduledJobs, showNotification]);
+  }, [scheduledJobsApi, showNotification]);
 
   const getStatusColor = (status: string) => {
     if (isDarkMode) {
@@ -443,7 +443,7 @@ export const Scheduler: React.FC = () => {
               Error loading scheduled jobs: {scheduledJobsApi.error}
             </p>
             <button
-              onClick={fetchScheduledJobs}
+              onClick={() => scheduledJobsApi.execute(() => apiService.getScheduledJobs())}
               className="mt-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
             >
               Retry
