@@ -54,4 +54,12 @@ database = Database()
 
 async def get_database() -> Database:
     """Dependency to get database instance."""
+    # Try to connect if not already connected
+    if database.client is None:
+        try:
+            await database.connect()
+        except Exception as e:
+            logger.warning(f"Database connection failed: {e}")
+            # Don't set client to None, just leave it as None
+            # This allows the application to continue with limited functionality
     return database 

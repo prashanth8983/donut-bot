@@ -49,9 +49,8 @@ class MetricsService:
             else: # "all"
                 start_time = datetime.min.replace(tzinfo=timezone.utc) # From the beginning of time
             
-            # Placeholder for historical data - assuming engine.get_historical_data() exists
-            # In a real scenario, this would query a database or a persistent store
-            historical_data = await engine.get_historical_data(start_time, end_time) # This method needs to be implemented in engine.py
+            # Get historical data from the engine
+            historical_data = await engine.get_historical_data(start_time, end_time)
             
             pages_crawled_over_time = [d['pages_crawled'] for d in historical_data]
             errors_over_time = [d['errors'] for d in historical_data]
