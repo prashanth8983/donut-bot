@@ -58,14 +58,14 @@ class ApiService {
   }
 
   // Crawler Management
-  async startCrawler(config?: CrawlerConfig): Promise<ApiResponse> {
+  async startCrawler(config?: CrawlerConfig): Promise<ApiResponse<any>> {
     return this.request('/api/v1/crawler/start', {
       method: 'POST',
       body: JSON.stringify({ config }),
     });
   }
 
-  async stopCrawler(): Promise<ApiResponse> {
+  async stopCrawler(): Promise<ApiResponse<any>> {
     return this.request('/api/v1/crawler/stop', {
       method: 'POST',
     });
@@ -81,15 +81,21 @@ class ApiService {
     redis_processing?: boolean;
     redis_queue?: boolean;
     bloom_filter?: boolean;
-  }): Promise<ApiResponse> {
-    return this.request('/api/v1/crawler/reset', {
+  }): Promise<ApiResponse<any>> {
+    const params = new URLSearchParams();
+    if (options?.redis_completed !== undefined) params.append('clear_completed', options.redis_completed.toString());
+    if (options?.redis_seen !== undefined) params.append('clear_seen', options.redis_seen.toString());
+    if (options?.redis_processing !== undefined) params.append('clear_processing', options.redis_processing.toString());
+    if (options?.redis_queue !== undefined) params.append('clear_queue', options.redis_queue.toString());
+    if (options?.bloom_filter !== undefined) params.append('clear_bloom_filter', options.bloom_filter.toString());
+    
+    return this.request(`/api/v1/crawler/flush_status?${params.toString()}`, {
       method: 'POST',
-      body: JSON.stringify(options),
     });
   }
 
   // URL Management
-  async addUrls(urls: string[]): Promise<ApiResponse> {
+  async addUrls(urls: string[]): Promise<ApiResponse<any>> {
     return this.request('/api/v1/urls/add', {
       method: 'POST',
       body: JSON.stringify({ urls }),
@@ -100,7 +106,7 @@ class ApiService {
     return this.request<QueueStatus>('/api/v1/urls/queue/');
   }
 
-  async clearUrls(): Promise<ApiResponse> {
+  async clearUrls(): Promise<ApiResponse<any>> {
     return this.request('/api/v1/urls/clear', {
       method: 'DELETE',
     });
@@ -111,7 +117,7 @@ class ApiService {
     return this.request<CrawlerConfig>('/api/v1/config/');
   }
 
-  async updateConfig(config: Partial<CrawlerConfig>): Promise<ApiResponse> {
+  async updateConfig(config: Partial<CrawlerConfig>): Promise<ApiResponse<any>> {
     return this.request('/api/v1/config', {
       method: 'PUT',
       body: JSON.stringify(config),
@@ -125,7 +131,7 @@ class ApiService {
   async updateAllowedDomains(
     action: 'add' | 'remove' | 'replace',
     domains: string[]
-  ): Promise<ApiResponse> {
+  ): Promise<ApiResponse<any>> {
     return this.request('/api/v1/config/domains', {
       method: 'PUT',
       body: JSON.stringify({ action, domains }),
@@ -154,7 +160,7 @@ class ApiService {
     return this.request(`/api/v1/results/${urlHash}`);
   }
 
-  async clearResults(): Promise<ApiResponse> {
+  async clearResults(): Promise<ApiResponse<any>> {
     return this.request('/api/v1/results', {
       method: 'DELETE',
     });
@@ -183,31 +189,31 @@ class ApiService {
     });
   }
 
-  async deleteJob(id: string): Promise<ApiResponse> {
+  async deleteJob(id: string): Promise<ApiResponse<any>> {
     return this.request(`/api/v1/jobs/${id}`, {
       method: 'DELETE',
     });
   }
 
-  async startJob(id: string): Promise<ApiResponse> {
+  async startJob(id: string): Promise<ApiResponse<any>> {
     return this.request(`/api/v1/jobs/${id}/start`, {
       method: 'POST',
     });
   }
 
-  async stopJob(id: string): Promise<ApiResponse> {
+  async stopJob(id: string): Promise<ApiResponse<any>> {
     return this.request(`/api/v1/jobs/${id}/stop`, {
       method: 'POST',
     });
   }
 
-  async pauseJob(id: string): Promise<ApiResponse> {
+  async pauseJob(id: string): Promise<ApiResponse<any>> {
     return this.request(`/api/v1/jobs/${id}/pause`, {
       method: 'POST',
     });
   }
 
-  async resumeJob(id: string): Promise<ApiResponse> {
+  async resumeJob(id: string): Promise<ApiResponse<any>> {
     return this.request(`/api/v1/jobs/${id}/resume`, {
       method: 'POST',
     });
@@ -232,19 +238,19 @@ class ApiService {
     });
   }
 
-  async deleteScheduledJob(id: string): Promise<ApiResponse> {
+  async deleteScheduledJob(id: string): Promise<ApiResponse<any>> {
     return this.request(`/api/v1/scheduler/jobs/${id}`, {
       method: 'DELETE',
     });
   }
 
-  async enableScheduledJob(id: string): Promise<ApiResponse> {
+  async enableScheduledJob(id: string): Promise<ApiResponse<any>> {
     return this.request(`/api/v1/scheduler/jobs/${id}/enable`, {
       method: 'POST',
     });
   }
 
-  async disableScheduledJob(id: string): Promise<ApiResponse> {
+  async disableScheduledJob(id: string): Promise<ApiResponse<any>> {
     return this.request(`/api/v1/scheduler/jobs/${id}/disable`, {
       method: 'POST',
     });

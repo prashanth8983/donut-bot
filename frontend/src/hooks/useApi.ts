@@ -22,7 +22,7 @@ export function useApi<T>() {
       const response = await apiCall();
       if (response.success) {
         setState({
-          data: response.data,
+          data: response.data || null,
           loading: false,
           error: null,
         });
