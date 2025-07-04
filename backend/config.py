@@ -10,82 +10,90 @@ from typing import List, Optional
 from pydantic import BaseModel, Field, ValidationError
 from pydantic_settings import BaseSettings
 
-# Check if we're running locally (config_local.json exists)
-CONFIG_PATH = Path(__file__).parent / "config.json"
-LOCAL_CONFIG_PATH = Path(__file__).parent / "config_local.json"
-
-# Use local config if it exists, otherwise use the default
-if LOCAL_CONFIG_PATH.exists():
-    CONFIG_PATH = LOCAL_CONFIG_PATH
-
 class Settings(BaseSettings):
     """Application settings loaded from environment variables with JSON fallback."""
     
     # Application
-    app_name: str = "Donut Bot API"
-    app_version: str = "1.0.0"
-    debug: bool = True
+    app_name: str = Field("Donut Bot API", env="APP_NAME")
+    app_version: str = Field("1.0.0", env="APP_VERSION")
+    debug: bool = Field(True, env="DEBUG")
     
     # Server
-    host: str = "0.0.0.0"
-    port: int = 8089
+    host: str = Field("0.0.0.0", env="HOST")
+    port: int = Field(8089, env="PORT")
     
     # Database
-    mongo_uri: str = "mongodb://admin:password123@mongodb:27017/webcrawler?authSource=admin"
-    database_name: str = "webcrawler"
+    mongo_uri: str = Field(..., env="MONGO_URI") # This should always come from env
+    database_name: str = Field("webcrawler", env="DATABASE_NAME")
     
     # Redis
-    redis_host: str = "redis"
-    redis_port: int = 6379
-    redis_db: int = 0
+    redis_host: str = Field("redis", env="REDIS_HOST")
+    redis_port: int = Field(6379, env="REDIS_PORT")
+    redis_db: int = Field(0, env="REDIS_DB")
     
     # Kafka
-    kafka_brokers: str = "kafka:29092"
-    kafka_topic: str = "raw-documents"
-    enable_kafka_output: bool = False
+    kafka_brokers: str = Field("kafka:29092", env="KAFKA_BROKERS")
+    kafka_topic: str = Field("raw-documents", env="KAFKA_TOPIC")
+    enable_kafka_output: bool = Field(False, env="ENABLE_KAFKA_OUTPUT")
     
     # Crawler Configuration
-    default_workers: int = 3
-    default_max_depth: int = 3
-    default_max_pages: int = 4000
-    default_delay: float = 2.0
-    default_allowed_domains: List[str] = ["northeastern.edu", "nyu.edu", "stanford.edu", "mit.edu"]
+    default_workers: int = Field(3, env="DEFAULT_WORKERS")
+    default_max_depth: int = Field(3, env="DEFAULT_MAX_DEPTH")
+    default_max_pages: int = Field(4000, env="DEFAULT_MAX_PAGES")
+    default_delay: float = Field(2.0, env="DEFAULT_DELAY")
+    default_allowed_domains: List[str] = Field(["northeastern.edu", "nyu.edu", "stanford.edu", "mit.edu"], env="DEFAULT_ALLOWED_DOMAINS")
     
     # Security
-    secret_key: str = "your-secret-key-here"
-    access_token_expire_minutes: int = 30
+    secret_key: str = Field(..., env="SECRET_KEY") # This should always come from env
+    access_token_expire_minutes: int = Field(30, env="ACCESS_TOKEN_EXPIRE_MINUTES")
     
     # CORS
-    cors_origins: List[str] = ["http://localhost:3000", "http://localhost:8080", "http://frontend:80"]
+    cors_origins: List[str] = Field(["http://localhost:3000", "http://localhost:8080", "http://frontend:80"], env="CORS_ORIGINS")
     
     # Logging
-    log_level: str = "DEBUG"
+    log_level: str = Field("DEBUG", env="LOG_LEVEL")
     
     # File Storage
-    enable_local_save: bool = True
-    local_output_dir: str = "/app/crawler_output"
+    enable_local_save: bool = Field(True, env="ENABLE_LOCAL_SAVE")
+    local_output_dir: str = Field("/app/crawler_output", env="LOCAL_OUTPUT_DIR")
     
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
         case_sensitive = False
-    
-    @classmethod
-    def load(cls, path: Path = CONFIG_PATH):
-        """Load settings from JSON file with environment variable override."""
-        # Load from JSON file
-        if path.exists():
-            with open(path, "r") as f:
-                data = json.load(f)
-        else:
-            data = {}
         
-        # Create settings instance with JSON data as defaults
-        try:
-            return cls(**data)
-        except ValidationError as e:
-            raise RuntimeError(f"Invalid config: {e}")
-
+        @classmethod
+        def customise_sources(
+            cls,
+            init_settings,
+            env_settings,
+            file_secret_settings,
+        ):
+            return (
+                env_settings,
+                init_settings,
+                file_secret_settings,
+            )
 
 # Global settings instance
-settings = Settings.load() 
+settings = Settings()
+
+# Load from JSON files for non-sensitive defaults, overriding with environment variables
+CONFIG_PATH = Path(__file__).parent / "config.json"
+LOCAL_CONFIG_PATH = Path(__file__).parent / "config_local.json"
+
+# Load default config
+if CONFIG_PATH.exists():
+    with open(CONFIG_PATH, "r") as f:
+        default_config = json.load(f)
+    settings = Settings(**default_config)
+
+# Load local config if it exists, overriding defaults
+if LOCAL_CONFIG_PATH.exists():
+    with open(LOCAL_CONFIG_PATH, "r") as f:
+        local_config = json.load(f)
+    settings = Settings(**{**default_config, **local_config})
+
+# Environment variables will now override any values loaded from JSON files due to customise_sources
+settings = Settings()
+ 

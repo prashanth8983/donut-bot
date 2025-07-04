@@ -94,11 +94,12 @@ backend/
    ```
 
 2. **Environment Setup**:
+   Sensitive configurations (e.g., database credentials, secret keys) should be provided via environment variables. Refer to `backend/config.py` for a full list of configurable environment variables.
    ```bash
-   # Set up environment variables
-   export REDIS_HOST=localhost
-   export REDIS_PORT=6379
-   export MONGODB_URL=mongodb://localhost:27017
+   # Example environment variables
+   export MONGO_URI="mongodb://user:password@host:port/database?authSource=admin"
+   export SECRET_KEY="your-super-secret-key"
+   # Other variables like REDIS_HOST, KAFKA_BROKERS, etc., can also be set via environment variables.
    ```
 
 3. **Start the Application**:

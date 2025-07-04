@@ -1,1 +1,50 @@
 @import "tailwindcss";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Define CSS variables for colors */
+:root {
+  --color-bg-primary: #f9fafb; /* gray-50 */
+  --color-bg-secondary: #f5f5f4; /* stone-50 */
+  --color-text-primary: #1f2937; /* gray-900 */
+  --color-scrollbar-track: #f1f5f9; /* slate-100 */
+  --color-scrollbar-thumb: #cbd5e1; /* slate-300 */
+  --color-scrollbar-thumb-hover: #94a3b8; /* slate-400 */
+}
+
+.dark {
+  --color-bg-primary: #18181b; /* zinc-900 */
+  --color-bg-secondary: #18181b; /* zinc-900 */
+  --color-text-primary: #f5f5f5; /* neutral-100 */
+  --color-scrollbar-track: #27272a; /* zinc-800 */
+  --color-scrollbar-thumb: #52525b; /* zinc-600 */
+  --color-scrollbar-thumb-hover: #71717a; /* zinc-500 */
+}
+
+/* Apply colors using CSS variables */
+body {
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+}
+
+/* Scrollbar styling using CSS variables */
+main::-webkit-scrollbar {
+  width: 8px;
+}
+main::-webkit-scrollbar-track {
+  background: var(--color-scrollbar-track);
+  border-radius: 4px;
+}
+main::-webkit-scrollbar-thumb {
+  background: var(--color-scrollbar-thumb);
+  border-radius: 4px;
+}
+main::-webkit-scrollbar-thumb:hover {
+  background: var(--color-scrollbar-thumb-hover);
+}
+main {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-scrollbar-thumb) var(--color-scrollbar-track);
+}

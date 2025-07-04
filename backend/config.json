@@ -4,7 +4,6 @@
   "debug": true,
   "host": "0.0.0.0",
   "port": 8089,
-  "mongo_uri": "mongodb://admin:password123@mongodb:27017/webcrawler?authSource=admin",
   "database_name": "webcrawler",
   "redis_host": "redis",
   "redis_port": 6379,
@@ -24,7 +23,6 @@
     "stanford.edu",
     "mit.edu"
   ],
-  "secret_key": "your-secret-key-here",
   "access_token_expire_minutes": 30,
   "cors_origins": [
     "http://localhost:3000",

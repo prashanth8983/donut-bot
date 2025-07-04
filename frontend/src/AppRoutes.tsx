@@ -24,10 +24,42 @@ const AppRoutes: React.FC = () => {
   } = useDashboard();
 
   return (
-    <div className={`flex h-screen overflow-hidden transition-colors duration-300 ${
-      isDarkMode ? 'bg-zinc-900' : 'bg-gray-50'
-    }`}>
-      <div className={`hidden md:block transition-all duration-300 ease-in-out`}>
+    import React, { useEffect } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import DashboardPage from './pages/DashboardPage';
+import JobsPage from './pages/JobsPage';
+import DomainManagerPage from './pages/DomainManagerPage';
+import { ResultsPage } from './pages/ResultsPage';
+import SchedulerPage from './pages/SchedulerPage';
+import SettingsPage from './pages/SettingsPage';
+import NotFoundPage from './pages/NotFoundPage';
+import Header from './components/layout/Header';
+import Sidebar from './components/layout/Sidebar';
+import MobileNav from './components/layout/MobileNav';
+import NotificationToast from './components/layout/NotificationToast';
+import { useDashboard } from './contexts/DashboardContext';
+
+const AppRoutes: React.FC = () => {
+  const { 
+    isMobileNavOpen, 
+    toggleMobileNav, 
+    isSidebarMinimized, 
+    toggleSidebar,
+    isDarkMode,
+    notifications
+  } = useDashboard();
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
+
+  return (
+    <div className="flex h-screen overflow-hidden transition-colors duration-300 bg-[var(--color-bg-primary)]">
+      <div className="hidden md:block transition-all duration-300 ease-in-out">
         <Sidebar 
           isMinimized={isSidebarMinimized} 
           toggleSidebar={toggleSidebar} 
@@ -44,35 +76,7 @@ const AppRoutes: React.FC = () => {
           />
         </div>
 
-        <main className={`
-          flex-1 relative overflow-y-auto focus:outline-none 
-          p-4 md:p-6 transition-all duration-300 ease-in-out
-          ${isDarkMode 
-            ? 'bg-zinc-900 text-neutral-100' 
-            : 'bg-stone-50 text-gray-900'
-          }
-        `}>
-          <style>{`
-            main::-webkit-scrollbar {
-              width: 8px;
-            }
-            main::-webkit-scrollbar-track {
-              background: ${isDarkMode ? '#27272a' : '#f1f5f9'};
-              border-radius: 4px;
-            }
-            main::-webkit-scrollbar-thumb {
-              background: ${isDarkMode ? '#52525b' : '#cbd5e1'};
-              border-radius: 4px;
-            }
-            main::-webkit-scrollbar-thumb:hover {
-              background: ${isDarkMode ? '#71717a' : '#94a3b8'};
-            }
-            main {
-              scrollbar-width: thin;
-              scrollbar-color: ${isDarkMode ? '#52525b #27272a' : '#cbd5e1 #f1f5f9'};
-            }
-          `}</style>
-          
+        <main className="flex-1 relative overflow-y-auto focus:outline-none p-4 md:p-6 transition-all duration-300 ease-in-out bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]">
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
