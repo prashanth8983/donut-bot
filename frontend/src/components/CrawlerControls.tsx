@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Play, Square, RotateCcw, Settings, Activity, Clock, Zap } from 'lucide-react';
+import { Play, Square, RotateCcw, Settings, Activity, Clock, Zap, ChevronRight, Loader2 } from 'lucide-react';
 import { apiService } from '../services/api';
 import type { CrawlerStatus } from '../types';
 import { useDashboard } from '../contexts/DashboardContext';
+import Card from './ui/Card';
 
 export const CrawlerControls: React.FC = () => {
   const { showNotification, isDarkMode } = useDashboard();
@@ -11,11 +12,16 @@ export const CrawlerControls: React.FC = () => {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [uptime, setUptime] = useState<number>(0);
 
-  const fetchStatus = React.useCallback(async () => {
+  const fetchStatus = useCallback(async () => {
     try {
       const response = await apiService.getCrawlerStatus();
       if (response.success) {
         setStatus(response.data || null);
+        if (response.data) {
+          setUptime(response.data.uptime_seconds);
+        }
+      } else {
+        showNotification(`Failed to fetch status: ${response.error}`, 'error');
       }
     } catch (error: unknown) {
       showNotification(`Failed to fetch status: ${(error as Error).message || String(error)}`, 'error');
@@ -24,32 +30,27 @@ export const CrawlerControls: React.FC = () => {
 
   useEffect(() => {
     fetchStatus();
-    const interval = setInterval(fetchStatus, 3000); // Update every 3 seconds
+    const interval = setInterval(fetchStatus, 5000);
     return () => clearInterval(interval);
   }, [fetchStatus]);
 
-  // Whenever status.uptime_seconds changes, reset local uptime
   useEffect(() => {
-    if (status && typeof status.uptime_seconds === 'number') {
-      setUptime(status.uptime_seconds);
+    let timer: NodeJS.Timeout;
+    if (status?.crawler_running) {
+      timer = setInterval(() => {
+        setUptime((prev) => prev + 1);
+      }, 1000);
     }
-  }, [status]);
-
-  // Increment uptime every second
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setUptime((prev) => prev + 1);
-    }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [status?.crawler_running]);
 
-  const handleAction = React.useCallback(async (action: string, apiCall: () => Promise<any>) => {
+  const handleAction = useCallback(async (action: string, apiCall: () => Promise<any>) => {
     setActionLoading(action);
     try {
       const response = await apiCall();
       if (response.success) {
         showNotification(`Crawler ${action} successfully`, 'success');
-        fetchStatus();
+        await fetchStatus();
       } else {
         showNotification(`Failed to ${action} crawler: ${response.error}`, 'error');
       }
@@ -60,154 +61,92 @@ export const CrawlerControls: React.FC = () => {
     }
   }, [fetchStatus, showNotification]);
 
-  const handleStart = () => {
-    handleAction('start', () => apiService.startCrawler());
-  };
-
-  const handleStop = () => {
-    handleAction('stop', () => apiService.stopCrawler());
-  };
-
+  const handleStart = () => handleAction('start', apiService.startCrawler);
+  const handleStop = () => handleAction('stop', apiService.stopCrawler);
   const handleReset = () => {
     if (window.confirm('Are you sure you want to reset the crawler? This will clear all queues and data.')) {
-      handleAction('reset', () => apiService.resetCrawler({
-        redis_completed: true,
-        redis_seen: true,
-        redis_processing: true,
-        redis_queue: true,
-        bloom_filter: true,
-      }));
+      handleAction('reset', () => apiService.resetCrawler({ redis_all: true }));
     }
   };
 
   const formatUptime = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${hours}h ${minutes}m ${secs}s`;
+    const d = Math.floor(seconds / (3600*24));
+    const h = Math.floor(seconds % (3600*24) / 3600);
+    const m = Math.floor(seconds % 3600 / 60);
+    const s = Math.floor(seconds % 60);
+    return `${d > 0 ? `${d}d ` : ''}${h > 0 ? `${h}h ` : ''}${m > 0 ? `${m}m ` : ''}${s}s`;
   };
 
-  const getStatusColor = () => {
-    if (!status) return 'gray';
-    return status.crawler_running ? 'green' : 'red';
-  };
-
-  const getStatusText = () => {
-    if (!status) return 'Unknown';
-    return status.crawler_running ? 'Running' : 'Stopped';
-  };
+  const isRunning = status?.crawler_running ?? false;
 
   return (
-    <div className={`${isDarkMode ? 'bg-stone-800 border-stone-700' : 'bg-white border-gray-200'} rounded-lg border p-6`}>
+    <Card>
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <Activity className="w-6 h-6 text-blue-600" />
-          <h2 className={`text-xl font-semibold ${isDarkMode ? 'text-stone-100' : 'text-gray-900'}`}>Crawler Controls</h2>
+          <Activity className="w-7 h-7 text-sky-500" />
+          <h2 className={`text-xl font-bold ${isDarkMode ? 'text-zinc-100' : 'text-slate-800'}`}>Crawler Controls</h2>
         </div>
         <Link
           to="/settings"
-          className={`flex items-center gap-2 px-3 py-2 ${isDarkMode ? 'text-stone-400 hover:text-stone-200' : 'text-gray-600 hover:text-gray-800'} transition-colors`}
+          className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${isDarkMode ? 'text-zinc-300 hover:bg-zinc-800' : 'text-slate-600 hover:bg-slate-100'}`}
         >
           <Settings className="w-4 h-4" />
-          Configure
+          <span>Configure</span>
+          <ChevronRight className="w-4 h-4" />
         </Link>
       </div>
 
-      {/* Status Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className={`${isDarkMode ? 'bg-stone-700' : 'bg-gray-50'} rounded-lg p-4`}>
-          <div className="flex items-center gap-2 mb-2">
-            <div className={`w-3 h-3 rounded-full bg-${getStatusColor()}-500`}></div>
-            <span className={`text-sm font-medium ${isDarkMode ? 'text-stone-300' : 'text-gray-700'}`}>Status</span>
-          </div>
-          <p className={`text-lg font-semibold ${isDarkMode ? 'text-stone-100' : 'text-gray-900'}`}>{getStatusText()}</p>
-        </div>
-
-        <div className={`${isDarkMode ? 'bg-stone-700' : 'bg-gray-50'} rounded-lg p-4`}>
-          <div className="flex items-center gap-2 mb-2">
-            <Clock className={`w-4 h-4 ${isDarkMode ? 'text-stone-400' : 'text-gray-500'}`} />
-            <span className={`text-sm font-medium ${isDarkMode ? 'text-stone-300' : 'text-gray-700'}`}>Uptime</span>
-          </div>
-          <p className={`text-lg font-semibold ${isDarkMode ? 'text-stone-100' : 'text-gray-900'}`}>
-            {typeof uptime === 'number' ? formatUptime(uptime) : '--'}
-          </p>
-        </div>
-
-        <div className={`${isDarkMode ? 'bg-stone-700' : 'bg-gray-50'} rounded-lg p-4`}>
-          <div className="flex items-center gap-2 mb-2">
-            <Zap className={`w-4 h-4 ${isDarkMode ? 'text-stone-400' : 'text-gray-500'}`} />
-            <span className={`text-sm font-medium ${isDarkMode ? 'text-stone-300' : 'text-gray-700'}`}>Pages/Second</span>
-          </div>
-          <p className={`text-lg font-semibold ${isDarkMode ? 'text-stone-100' : 'text-gray-900'}`}>
-            {typeof status?.avg_pages_per_second === 'number' ? status.avg_pages_per_second.toFixed(2) : '0.00'}
-          </p>
-        </div>
-      </div>
-
-      {/* Control Buttons */}
-      <div className="flex flex-wrap gap-3 mb-6">
-        <button
-          onClick={handleStart}
-          disabled={status?.crawler_running || actionLoading !== null}
-          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Play className="w-4 h-4" />
-          {actionLoading === 'start' ? 'Starting...' : 'Start'}
-        </button>
-
-        <button
-          onClick={handleStop}
-          disabled={!status?.crawler_running || actionLoading !== null}
-          className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Square className="w-4 h-4" />
-          {actionLoading === 'stop' ? 'Stopping...' : 'Stop'}
-        </button>
-
-        <button
-          onClick={handleReset}
-          disabled={actionLoading !== null}
-          className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <RotateCcw className="w-4 h-4" />
-          {actionLoading === 'reset' ? 'Resetting...' : 'Reset All'}
-        </button>
-
-      </div>
-
-      {/* Progress Information */}
-      {status && (
-        <div className="mt-6 space-y-3">
-          <div className="flex justify-between text-sm">
-            <span className={isDarkMode ? 'text-stone-400' : 'text-gray-600'}>Pages Crawled:</span>
-            <span className={`font-medium ${isDarkMode ? 'text-stone-200' : 'text-gray-900'}`}>{typeof status.pages_crawled_total === 'number' ? status.pages_crawled_total.toLocaleString() : '0'}</span>
-          </div>
-          {typeof status.max_pages_configured === 'number' && status.max_pages_configured > 0 && (
-            <div className="flex justify-between text-sm">
-              <span className={isDarkMode ? 'text-stone-400' : 'text-gray-600'}>Progress:</span>
-              <span className={`font-medium ${isDarkMode ? 'text-stone-200' : 'text-gray-900'}`}>
-                {Math.round((typeof status.pages_crawled_total === 'number' ? status.pages_crawled_total : 0 / status.max_pages_configured) * 100)}%
-              </span>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className={`${isDarkMode ? 'bg-zinc-800/50' : 'bg-slate-50/80'} rounded-xl p-4 flex items-center gap-4`}>
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${isRunning ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
+                <div className={`w-3 h-3 rounded-full ${isRunning ? 'bg-green-500' : 'bg-red-500'}`}></div>
             </div>
-          )}
-          <div className="flex justify-between text-sm">
-            <span className={isDarkMode ? 'text-stone-400' : 'text-gray-600'}>Queue Size:</span>
-            <span className={`font-medium ${isDarkMode ? 'text-stone-200' : 'text-gray-900'}`}>{typeof status.frontier_queue_size === 'number' ? status.frontier_queue_size.toLocaleString() : '0'}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className={isDarkMode ? 'text-stone-400' : 'text-gray-600'}>Processing:</span>
-            <span className={`font-medium ${isDarkMode ? 'text-stone-200' : 'text-gray-900'}`}>{typeof status.urls_in_processing === 'number' ? status.urls_in_processing.toLocaleString() : '0'}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className={isDarkMode ? 'text-stone-400' : 'text-gray-600'}>Completed:</span>
-            <span className={`font-medium ${isDarkMode ? 'text-stone-200' : 'text-gray-900'}`}>{typeof status.urls_completed_redis === 'number' ? status.urls_completed_redis.toLocaleString() : '0'}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className={isDarkMode ? 'text-stone-400' : 'text-gray-600'}>Errors:</span>
-            <span className={`font-medium ${isDarkMode ? 'text-stone-200' : 'text-gray-900'} text-red-600`}>{typeof status.total_errors_count === 'number' ? status.total_errors_count.toLocaleString() : '0'}</span>
-          </div>
+            <div>
+                <div className={`text-sm font-medium ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Status</div>
+                <p className={`text-lg font-bold ${isDarkMode ? 'text-zinc-100' : 'text-slate-800'}`}>{isRunning ? 'Running' : 'Stopped'}</p>
+            </div>
         </div>
-      )}
-    </div>
+        <div className={`${isDarkMode ? 'bg-zinc-800/50' : 'bg-slate-50/80'} rounded-xl p-4 flex items-center gap-4`}>
+            <div className="w-12 h-12 rounded-full flex items-center justify-center bg-sky-500/20 text-sky-500"><Clock className="w-6 h-6" /></div>
+            <div>
+                <div className={`text-sm font-medium ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Uptime</div>
+                <p className={`text-lg font-bold ${isDarkMode ? 'text-zinc-100' : 'text-slate-800'}`}>{formatUptime(uptime)}</p>
+            </div>
+        </div>
+        <div className={`${isDarkMode ? 'bg-zinc-800/50' : 'bg-slate-50/80'} rounded-xl p-4 flex items-center gap-4`}>
+            <div className="w-12 h-12 rounded-full flex items-center justify-center bg-purple-500/20 text-purple-500"><Zap className="w-6 h-6" /></div>
+            <div>
+                <div className={`text-sm font-medium ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Pages/Sec</div>
+                <p className={`text-lg font-bold ${isDarkMode ? 'text-zinc-100' : 'text-slate-800'}`}>{(status?.avg_pages_per_second ?? 0).toFixed(2)}</p>
+            </div>
+        </div>
+        <div className="flex items-center justify-end gap-3">
+            <button
+                onClick={handleStart}
+                disabled={isRunning || !!actionLoading}
+                className="w-12 h-12 flex items-center justify-center bg-green-500 text-white rounded-full hover:bg-green-600 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100 active:scale-95 shadow-lg hover:shadow-green-500/50"
+                title="Start Crawler"
+            >
+                {actionLoading === 'start' ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5" />}
+            </button>
+            <button
+                onClick={handleStop}
+                disabled={!isRunning || !!actionLoading}
+                className="w-12 h-12 flex items-center justify-center bg-red-500 text-white rounded-full hover:bg-red-600 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100 active:scale-95 shadow-lg hover:shadow-red-500/50"
+                title="Stop Crawler"
+            >
+                {actionLoading === 'stop' ? <Loader2 className="w-5 h-5 animate-spin" /> : <Square className="w-5 h-5" />}
+            </button>
+            <button
+                onClick={handleReset}
+                disabled={!!actionLoading}
+                className="w-12 h-12 flex items-center justify-center bg-orange-500 text-white rounded-full hover:bg-orange-600 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100 active:scale-95 shadow-lg hover:shadow-orange-500/50"
+                title="Reset Crawler"
+            >
+                {actionLoading === 'reset' ? <Loader2 className="w-5 h-5 animate-spin" /> : <RotateCcw className="w-5 h-5" />}
+            </button>
+        </div>
+      </div>
+    </Card>
   );
 };
