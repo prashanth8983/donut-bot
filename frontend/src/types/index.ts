@@ -94,6 +94,7 @@ export interface Metrics {
   content_type_counts?: Record<string, number>;
   status_code_counts?: Record<string, number>;
   queue_size_over_time?: number[];
+  daily_crawl_heatmap?: number[][];
 }
 
 export interface ScheduledJob {
@@ -124,4 +125,19 @@ export interface SchedulerStats {
   enabled_jobs: number;
   disabled_jobs: number;
   next_runs: NextRun[];
+}
+
+export interface MenuItem {
+  id: string;
+  title: string;
+  path: string;
+  icon: string;
+}
+
+export interface Notification {
+  id: string;
+  message: string;
+  type: 'success' | 'error' | 'info';
+  read?: boolean;
+  timestamp?: string;
 } 
