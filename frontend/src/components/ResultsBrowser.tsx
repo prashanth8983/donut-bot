@@ -173,12 +173,12 @@ export const ResultsBrowser: React.FC = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className={`text-2xl font-bold ${isDarkMode ? 'text-stone-100' : 'text-gray-900'}`}>Results Browser</h1>
+        <h1 className={`text-2xl font-bold ${isDarkMode ? 'text-zinc-100' : 'text-slate-800'}`}>Results Browser</h1>
         <div className="flex items-center gap-3">
           <button
             onClick={fetchResults}
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
@@ -186,7 +186,7 @@ export const ResultsBrowser: React.FC = () => {
           <button
             onClick={() => exportResults('json')}
             disabled={filteredResults.length === 0}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-sky-500 text-white rounded-lg hover:bg-sky-600 transition-colors disabled:opacity-50"
           >
             <Download className="w-4 h-4" />
             Export JSON
@@ -203,45 +203,37 @@ export const ResultsBrowser: React.FC = () => {
       </div>
 
       {/* Filters */}
-      <div className={`${isDarkMode ? 'bg-stone-800 border-stone-700' : 'bg-white border-gray-200'} rounded-lg border p-6`}>
+      <div className={`backdrop-blur-xl rounded-xl shadow-md p-6 border ${isDarkMode ? 'bg-zinc-900/70 shadow-zinc-950/50 border-zinc-800/80' : 'bg-white/70 border-slate-200/80'}`}>
         <div className="flex items-center gap-2 mb-4">
-          <Filter className={`w-5 h-5 ${isDarkMode ? 'text-stone-400' : 'text-gray-600'}`} />
-          <h2 className={`text-lg font-semibold ${isDarkMode ? 'text-stone-100' : 'text-gray-900'}`}>Filters</h2>
+          <Filter className={`w-5 h-5 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`} />
+          <h2 className={`text-lg font-semibold ${isDarkMode ? 'text-zinc-100' : 'text-slate-800'}`}>Filters</h2>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
-            <label className={`block text-sm font-medium ${isDarkMode ? 'text-stone-300' : 'text-gray-700'} mb-2`}>
+            <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-zinc-400' : 'text-slate-600'}`}>
               Search
             </label>
             <div className="relative">
-              <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${isDarkMode ? 'text-stone-400' : 'text-gray-400'} w-4 h-4`} />
+              <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`} />
               <input
                 type="text"
                 placeholder="Search URLs, titles, or content..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className={`pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full ${
-                  isDarkMode 
-                    ? 'border-stone-600 bg-stone-700 text-stone-100 placeholder-stone-400' 
-                    : 'border-gray-300 bg-white text-gray-900'
-                }`}
+                className={`pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 w-full ${isDarkMode ? 'bg-zinc-800/80 border-zinc-700 text-zinc-200 placeholder-zinc-400' : 'bg-white/80 border-slate-300 text-slate-800 placeholder-slate-500'}`}
               />
             </div>
           </div>
 
           <div>
-            <label className={`block text-sm font-medium ${isDarkMode ? 'text-stone-300' : 'text-gray-700'} mb-2`}>
+            <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-zinc-400' : 'text-slate-600'}`}>
               Domain
             </label>
             <select
               value={selectedDomain}
               onChange={(e) => setSelectedDomain(e.target.value)}
-              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                isDarkMode 
-                  ? 'border-stone-600 bg-stone-700 text-stone-100' 
-                  : 'border-gray-300 bg-white text-gray-900'
-              }`}
+              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 ${isDarkMode ? 'bg-zinc-800/80 border-zinc-700 text-zinc-200' : 'bg-white/80 border-slate-300 text-slate-800'}`}
             >
               <option value="all">All Domains</option>
               {domains.map(domain => (
@@ -251,17 +243,13 @@ export const ResultsBrowser: React.FC = () => {
           </div>
 
           <div>
-            <label className={`block text-sm font-medium ${isDarkMode ? 'text-stone-300' : 'text-gray-700'} mb-2`}>
+            <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-zinc-400' : 'text-slate-600'}`}>
               Status
             </label>
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                isDarkMode 
-                  ? 'border-stone-600 bg-stone-700 text-stone-100' 
-                  : 'border-gray-300 bg-white text-gray-900'
-              }`}
+              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 ${isDarkMode ? 'bg-zinc-800/80 border-zinc-700 text-zinc-200' : 'bg-white/80 border-slate-300 text-slate-800'}`}
             >
               <option value="all">All Status</option>
               <option value="success">Success (200)</option>
@@ -283,10 +271,10 @@ export const ResultsBrowser: React.FC = () => {
       </div>
 
       {/* Results Table */}
-      <div className={`${isDarkMode ? 'bg-stone-800 border-stone-700' : 'bg-white border-gray-200'} rounded-lg border overflow-hidden`}>
+      <div className={`backdrop-blur-xl rounded-xl shadow-md border overflow-hidden ${isDarkMode ? 'bg-zinc-900/70 shadow-zinc-950/50 border-zinc-800/80' : 'bg-white/70 border-slate-200/80'}`}>
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className={`${isDarkMode ? 'bg-stone-700' : 'bg-gray-50'}`}>
+            <thead className={isDarkMode ? 'bg-zinc-800' : 'bg-slate-100'}>
               <tr>
                 <th className="px-4 py-3 text-left">
                   <input
@@ -296,12 +284,12 @@ export const ResultsBrowser: React.FC = () => {
                     className="rounded"
                   />
                 </th>
-                <th className={`px-4 py-3 text-left text-sm font-medium ${isDarkMode ? 'text-stone-300' : 'text-gray-700'}`}>URL</th>
-                <th className={`px-4 py-3 text-left text-sm font-medium ${isDarkMode ? 'text-stone-300' : 'text-gray-700'}`}>Title</th>
-                <th className={`px-4 py-3 text-left text-sm font-medium ${isDarkMode ? 'text-stone-300' : 'text-gray-700'}`}>Status</th>
-                <th className={`px-4 py-3 text-left text-sm font-medium ${isDarkMode ? 'text-stone-300' : 'text-gray-700'}`}>Domain</th>
-                <th className={`px-4 py-3 text-left text-sm font-medium ${isDarkMode ? 'text-stone-300' : 'text-gray-700'}`}>Depth</th>
-                <th className={`px-4 py-3 text-left text-sm font-medium ${isDarkMode ? 'text-stone-300' : 'text-gray-700'}`}>Actions</th>
+                <th className={`px-4 py-3 text-left text-sm font-medium ${isDarkMode ? 'text-zinc-400' : 'text-slate-600'}`}>URL</th>
+                <th className={`px-4 py-3 text-left text-sm font-medium ${isDarkMode ? 'text-zinc-400' : 'text-slate-600'}`}>Title</th>
+                <th className={`px-4 py-3 text-left text-sm font-medium ${isDarkMode ? 'text-zinc-400' : 'text-slate-600'}`}>Status</th>
+                <th className={`px-4 py-3 text-left text-sm font-medium ${isDarkMode ? 'text-zinc-400' : 'text-slate-600'}`}>Domain</th>
+                <th className={`px-4 py-3 text-left text-sm font-medium ${isDarkMode ? 'text-zinc-400' : 'text-slate-600'}`}>Depth</th>
+                <th className={`px-4 py-3 text-left text-sm font-medium ${isDarkMode ? 'text-zinc-400' : 'text-slate-600'}`}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -309,15 +297,15 @@ export const ResultsBrowser: React.FC = () => {
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-center">
                     <div className="flex items-center justify-center">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                      <span className={`ml-2 ${isDarkMode ? 'text-stone-400' : 'text-gray-600'}`}>Loading results...</span>
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-500"></div>
+                      <span className={`ml-2 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Loading results...</span>
                     </div>
                   </td>
                 </tr>
               ) : paginatedResults.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-center">
-                    <span className={`${isDarkMode ? 'text-stone-400' : 'text-gray-600'}`}>No results found</span>
+                    <span className={isDarkMode ? 'text-zinc-400' : 'text-slate-500'}>No results found</span>
                   </td>
                 </tr>
               ) : (
@@ -326,9 +314,9 @@ export const ResultsBrowser: React.FC = () => {
                     key={result.url}
                     className={`${
                       index % 2 === 0
-                        ? isDarkMode ? 'bg-stone-800' : 'bg-white'
-                        : isDarkMode ? 'bg-stone-700' : 'bg-gray-50'
-                    } hover:bg-blue-50 transition-colors`}
+                        ? isDarkMode ? 'bg-zinc-900' : 'bg-white'
+                        : isDarkMode ? 'bg-zinc-800' : 'bg-slate-50'
+                    } ${isDarkMode ? 'hover:bg-sky-900/20' : 'hover:bg-sky-50'} transition-colors`}
                   >
                     <td className="px-4 py-3">
                       <input
@@ -344,7 +332,7 @@ export const ResultsBrowser: React.FC = () => {
                           href={result.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className={`text-blue-600 hover:text-blue-800 ${isDarkMode ? 'text-blue-400 hover:text-blue-300' : ''}`}
+                          className={`${isDarkMode ? 'text-sky-400 hover:text-sky-300' : 'text-sky-500 hover:text-sky-600'}`}
                         >
                           {result.url}
                         </a>
@@ -352,7 +340,7 @@ export const ResultsBrowser: React.FC = () => {
                     </td>
                     <td className="px-4 py-3">
                       <div className="max-w-xs truncate">
-                        <span className={`${isDarkMode ? 'text-stone-200' : 'text-gray-900'}`}>
+                        <span className={isDarkMode ? 'text-zinc-200' : 'text-slate-800'}>
                           {result.title || 'No title'}
                         </span>
                       </div>
@@ -369,12 +357,12 @@ export const ResultsBrowser: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`${isDarkMode ? 'text-stone-300' : 'text-gray-600'}`}>
+                      <span className={isDarkMode ? 'text-zinc-400' : 'text-slate-500'}>
                         {result.domain || '-'}
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`${isDarkMode ? 'text-stone-300' : 'text-gray-600'}`}>
+                      <span className={isDarkMode ? 'text-zinc-400' : 'text-slate-500'}>
                         {result.depth || '-'}
                       </span>
                     </td>
@@ -382,7 +370,7 @@ export const ResultsBrowser: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => window.open(result.url, '_blank')}
-                          className={`p-1 ${isDarkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-800'} transition-colors`}
+                          className={`p-1 transition-colors ${isDarkMode ? 'text-sky-400 hover:text-sky-300' : 'text-sky-500 hover:text-sky-600'}`}
                           title="Open URL"
                         >
                           <ExternalLink className="w-4 h-4" />
@@ -392,7 +380,7 @@ export const ResultsBrowser: React.FC = () => {
                             // Show result details in a modal or expand row
                             console.log('View details:', result);
                           }}
-                          className={`p-1 ${isDarkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-600 hover:text-gray-800'} transition-colors`}
+                          className={`p-1 transition-colors ${isDarkMode ? 'text-zinc-400 hover:text-zinc-300' : 'text-slate-500 hover:text-slate-600'}`}
                           title="View details"
                         >
                           <Eye className="w-4 h-4" />
@@ -408,26 +396,26 @@ export const ResultsBrowser: React.FC = () => {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className={`px-4 py-3 border-t ${isDarkMode ? 'border-stone-700' : 'border-gray-200'}`}>
+          <div className={`px-4 py-3 border-t ${isDarkMode ? 'border-zinc-800' : 'border-slate-200'}`}>
             <div className="flex items-center justify-between">
-              <div className={`text-sm ${isDarkMode ? 'text-stone-400' : 'text-gray-600'}`}>
+              <div className={`text-sm ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>
                 Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredResults.length)} of {filteredResults.length} results
               </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                   disabled={currentPage === 1}
-                  className={`px-3 py-1 rounded ${isDarkMode ? 'text-stone-400 hover:text-stone-200' : 'text-gray-600 hover:text-gray-800'} disabled:opacity-50`}
+                  className={`px-3 py-1 rounded disabled:opacity-50 ${isDarkMode ? 'text-zinc-400 hover:text-zinc-200' : 'text-slate-500 hover:text-slate-700'}`}
                 >
                   Previous
                 </button>
-                <span className={`px-3 py-1 ${isDarkMode ? 'text-stone-300' : 'text-gray-900'}`}>
+                <span className={`px-3 py-1 ${isDarkMode ? 'text-zinc-300' : 'text-slate-700'}`}>
                   Page {currentPage} of {totalPages}
                 </span>
                 <button
                   onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                   disabled={currentPage === totalPages}
-                  className={`px-3 py-1 rounded ${isDarkMode ? 'text-stone-400 hover:text-stone-200' : 'text-gray-600 hover:text-gray-800'} disabled:opacity-50`}
+                  className={`px-3 py-1 rounded disabled:opacity-50 ${isDarkMode ? 'text-zinc-400 hover:text-zinc-200' : 'text-slate-500 hover:text-slate-700'}`}
                 >
                   Next
                 </button>
