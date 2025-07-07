@@ -1,51 +1,57 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Eye, Upload, Download, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Plus, Trash2, Upload, Download, AlertTriangle, Loader2, Link as LinkIcon, CheckCircle, XCircle } from 'lucide-react';
 import { apiService } from '../services/api';
 import type { QueueStatus } from '../types';
 import { useDashboard } from '../contexts/DashboardContext';
+import Card from './ui/Card';
 
 export const UrlManager: React.FC = () => {
   const { showNotification, isDarkMode } = useDashboard();
   const [queueStatus, setQueueStatus] = useState<QueueStatus | null>(null);
   const [newUrls, setNewUrls] = useState('');
-  const [adding, setAdding] = useState(false);
-  const [clearing, setClearing] = useState(false);
+  const [actionLoading, setActionLoading] = useState<'add' | 'clear' | null>(null);
 
-  useEffect(() => {
-    fetchQueueStatus();
-    const interval = setInterval(fetchQueueStatus, 3000); // Update every 3 seconds
-    return () => clearInterval(interval);
-  }, []);
-
-  const fetchQueueStatus = async () => {
+  const fetchQueueStatus = useCallback(async () => {
     try {
       const response = await apiService.getQueueStatus();
       if (response.success) {
         setQueueStatus(response.data || null);
+      } else {
+        showNotification(`Failed to fetch queue status: ${response.error}`, 'error');
       }
     } catch (error: unknown) {
-      console.error('Failed to fetch queue status:', error);
+      showNotification(`Failed to fetch queue status: ${(error as Error).message || String(error)}`, 'error');
     }
-  };
+  }, [showNotification]);
+
+  useEffect(() => {
+    fetchQueueStatus();
+    const interval = setInterval(fetchQueueStatus, 5000);
+    return () => clearInterval(interval);
+  }, [fetchQueueStatus]);
+
+  const { validUrls, invalidUrls } = useMemo(() => {
+    const urls = newUrls.split('\n').map(url => url.trim()).filter(Boolean);
+    const valid: string[] = [];
+    const invalid: string[] = [];
+    urls.forEach(url => {
+      try {
+        new URL(url);
+        valid.push(url);
+      } catch {
+        invalid.push(url);
+      }
+    });
+    return { validUrls: valid, invalidUrls: invalid };
+  }, [newUrls]);
 
   const handleAddUrls = async () => {
-    if (!newUrls.trim()) return;
-
-    const urls = newUrls
-      .split('\n')
-      .map(url => url.trim())
-      .filter(url => url.length > 0);
-
-    if (urls.length === 0) {
-      showNotification('Please enter at least one valid URL', 'error');
-      return;
-    }
-
-    setAdding(true);
+    if (validUrls.length === 0) return;
+    setActionLoading('add');
     try {
-      const response = await apiService.addUrls(urls);
+      const response = await apiService.addUrls(validUrls);
       if (response.success) {
-        showNotification(`${urls.length} URLs added successfully`, 'success');
+        showNotification(`${validUrls.length} URLs added successfully`, 'success');
         setNewUrls('');
         fetchQueueStatus();
       } else {
@@ -54,16 +60,13 @@ export const UrlManager: React.FC = () => {
     } catch (error: unknown) {
       showNotification(`Failed to add URLs: ${(error as Error).message || String(error)}`, 'error');
     } finally {
-      setAdding(false);
+      setActionLoading(null);
     }
   };
 
   const handleClearUrls = async () => {
-    if (!window.confirm('Are you sure you want to clear all URLs from the queue? This action cannot be undone.')) {
-      return;
-    }
-
-    setClearing(true);
+    if (!window.confirm('Are you sure you want to clear all URLs from the queue? This action cannot be undone.')) return;
+    setActionLoading('clear');
     try {
       const response = await apiService.clearUrls();
       if (response.success) {
@@ -75,213 +78,87 @@ export const UrlManager: React.FC = () => {
     } catch (error: unknown) {
       showNotification(`Failed to clear URLs: ${(error as Error).message || String(error)}`, 'error');
     } finally {
-      setClearing(false);
+      setActionLoading(null);
     }
   };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
-    reader.onload = (e) => {
-      const content = e.target?.result as string;
-      setNewUrls(content);
-    };
+    reader.onload = (e) => setNewUrls(e.target?.result as string);
     reader.readAsText(file);
   };
 
-  const downloadUrls = () => {
-    if (!newUrls.trim()) return;
-
-    const blob = new Blob([newUrls], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'urls.txt';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  const validateUrl = (url: string) => {
-    try {
-      new URL(url);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
-  const getUrlCount = () => {
-    return newUrls.split('\n').filter(url => url.trim().length > 0).length;
-  };
-
-  const getInvalidUrls = () => {
-    return newUrls
-      .split('\n')
-      .map(url => url.trim())
-      .filter(url => url.length > 0 && !validateUrl(url));
-  };
-
-  const invalidUrls = getInvalidUrls();
-
   return (
-    <div className="space-y-6">
-      {/* Queue Status */}
-      <div className={`${isDarkMode ? 'bg-stone-800 border-stone-700' : 'bg-white border-gray-200'} rounded-lg border p-6`}>
-        <h2 className={`text-lg font-semibold ${isDarkMode ? 'text-stone-100' : 'text-gray-900'} mb-4 flex items-center gap-2`}>
-          <Eye className="w-5 h-5" />
-          Queue Status
-        </h2>
-        
-        {queueStatus ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className={`${isDarkMode ? 'bg-blue-900/50' : 'bg-blue-50'} rounded-lg p-4`}>
-              <div className={`text-2xl font-bold ${isDarkMode ? 'text-blue-300' : 'text-blue-600'}`}>
-                {typeof queueStatus.queue_size === 'number' ? queueStatus.queue_size.toLocaleString() : '0'}
-              </div>
-              <div className={`text-sm ${isDarkMode ? 'text-blue-200' : 'text-blue-700'}`}>In Queue</div>
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="lg:col-span-2">
+        <Card>
+            <div className="flex items-center gap-3 mb-6">
+                <LinkIcon className="w-7 h-7 text-sky-500" />
+                <h2 className={`text-xl font-bold ${isDarkMode ? 'text-zinc-100' : 'text-slate-800'}`}>Add URLs to Queue</h2>
             </div>
-            
-            <div className={`${isDarkMode ? 'bg-yellow-900/50' : 'bg-yellow-50'} rounded-lg p-4`}>
-              <div className={`text-2xl font-bold ${isDarkMode ? 'text-yellow-300' : 'text-yellow-600'}`}>
-                {typeof queueStatus.processing_count === 'number' ? queueStatus.processing_count.toLocaleString() : '0'}
-              </div>
-              <div className={`text-sm ${isDarkMode ? 'text-yellow-200' : 'text-yellow-700'}`}>Processing</div>
-            </div>
-            
-            <div className={`${isDarkMode ? 'bg-green-900/50' : 'bg-green-50'} rounded-lg p-4`}>
-              <div className={`text-2xl font-bold ${isDarkMode ? 'text-green-300' : 'text-green-600'}`}>
-                {typeof queueStatus.completed_count === 'number' ? queueStatus.completed_count.toLocaleString() : '0'}
-              </div>
-              <div className={`text-sm ${isDarkMode ? 'text-green-200' : 'text-green-700'}`}>Completed</div>
-            </div>
-            
-            <div className={`${isDarkMode ? 'bg-stone-700' : 'bg-gray-50'} rounded-lg p-4`}>
-              <div className={`text-2xl font-bold ${isDarkMode ? 'text-stone-300' : 'text-gray-600'}`}>
-                {typeof queueStatus.seen_count === 'number' ? queueStatus.seen_count.toLocaleString() : '0'}
-              </div>
-              <div className={`text-sm ${isDarkMode ? 'text-stone-400' : 'text-gray-700'}`}>Seen</div>
-            </div>
-          </div>
-        ) : (
-          <div className={isDarkMode ? 'text-stone-400' : 'text-gray-500'}>Loading queue status...</div>
-        )}
-      </div>
-
-      {/* Add URLs */}
-      <div className={`${isDarkMode ? 'bg-stone-800 border-stone-700' : 'bg-white border-gray-200'} rounded-lg border p-6`}>
-        <h2 className={`text-lg font-semibold ${isDarkMode ? 'text-stone-100' : 'text-gray-900'} mb-4 flex items-center gap-2`}>
-          <Plus className="w-5 h-5" />
-          Add URLs
-        </h2>
-
-        <div className="space-y-4">
-          <div>
-            <label className={`block text-sm font-medium ${isDarkMode ? 'text-stone-300' : 'text-gray-700'} mb-2`}>
-              URLs (one per line)
-            </label>
             <textarea
               value={newUrls}
               onChange={(e) => setNewUrls(e.target.value)}
-              placeholder="https://example.com/page1&#10;https://example.com/page2&#10;https://example.com/page3"
-              rows={6}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                isDarkMode 
-                  ? 'border-stone-600 bg-stone-700 text-stone-100 placeholder-stone-400' 
-                  : 'border-gray-300 bg-white text-gray-900'
-              }`}
+              placeholder="https://example.com/page1\nhttps://example.com/page2"
+              rows={8}
+              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 font-mono text-sm ${isDarkMode ? 'bg-zinc-800/50 border-zinc-700' : 'bg-white/50 border-slate-300'}`}
             />
-            <div className="flex justify-between items-center mt-2">
-              <span className={`text-sm ${isDarkMode ? 'text-stone-400' : 'text-gray-500'}`}>
-                {getUrlCount()} URLs ready to add
-              </span>
-              {invalidUrls.length > 0 && (
-                <div className="flex items-center gap-1 text-red-600">
-                  <AlertCircle className="w-4 h-4" />
-                  <span className="text-sm">{invalidUrls.length} invalid URLs</span>
+            <div className="flex flex-wrap items-center justify-between mt-4 gap-4">
+                <div className="flex items-center gap-4 text-sm">
+                    <div className={`flex items-center gap-2 ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}><CheckCircle className="w-5 h-5" />{validUrls.length} valid</div>
+                    <div className={`flex items-center gap-2 ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}><XCircle className="w-5 h-5" />{invalidUrls.length} invalid</div>
                 </div>
-              )}
+                <div className="flex gap-3">
+                    <label className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors cursor-pointer ${isDarkMode ? 'bg-zinc-800 text-zinc-200 hover:bg-zinc-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
+                        <Upload className="w-5 h-5" />
+                        Upload
+                        <input type="file" accept=".txt,.csv" onChange={handleFileUpload} className="hidden" />
+                    </label>
+                    <button
+                        onClick={handleAddUrls}
+                        disabled={actionLoading === 'add' || validUrls.length === 0}
+                        className="flex items-center gap-2 px-4 py-2 bg-sky-500 text-white rounded-lg hover:bg-sky-600 transition-colors shadow-md hover:shadow-lg disabled:opacity-50"
+                    >
+                        {actionLoading === 'add' ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
+                        Add URLs
+                    </button>
+                </div>
             </div>
-          </div>
-
-          <div className="flex flex-wrap gap-3">
-            <button
-              onClick={handleAddUrls}
-              disabled={adding || getUrlCount() === 0 || invalidUrls.length > 0}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Plus className="w-4 h-4" />
-              {adding ? 'Adding...' : 'Add URLs'}
-            </button>
-
-            <label className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors cursor-pointer">
-              <Upload className="w-4 h-4" />
-              Upload File
-              <input
-                type="file"
-                accept=".txt,.csv"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-            </label>
-
-            <button
-              onClick={downloadUrls}
-              disabled={!newUrls.trim()}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Download className="w-4 h-4" />
-              Download
-            </button>
-          </div>
-        </div>
+        </Card>
       </div>
-
-      {/* Queue Management */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <Trash2 className="w-5 h-5" />
-          Queue Management
-        </h2>
-
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <AlertCircle className="w-5 h-5 text-red-600" />
-            <span className="text-sm font-medium text-red-800">Danger Zone</span>
-          </div>
-          <p className="text-sm text-red-700 mb-3">
-            Clearing the queue will remove all pending URLs. This action cannot be undone.
-          </p>
-          <button
-            onClick={handleClearUrls}
-            disabled={clearing || !queueStatus || typeof queueStatus.queue_size !== 'number' || queueStatus.queue_size === 0}
-            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Trash2 className="w-4 h-4" />
-            {clearing ? 'Clearing...' : 'Clear All URLs'}
-          </button>
-        </div>
+      <div>
+        <Card>
+            <h3 className={`text-lg font-bold mb-4 ${isDarkMode ? 'text-zinc-100' : 'text-slate-800'}`}>Queue Status</h3>
+            <div className="space-y-3">
+                <QueueStatItem label="In Queue" value={queueStatus?.queue_size} color="sky" isDarkMode={isDarkMode} />
+                <QueueStatItem label="Processing" value={queueStatus?.processing_count} color="yellow" isDarkMode={isDarkMode} />
+                <QueueStatItem label="Completed" value={queueStatus?.completed_count} color="green" isDarkMode={isDarkMode} />
+                <QueueStatItem label="Seen" value={queueStatus?.seen_count} color="slate" isDarkMode={isDarkMode} />
+            </div>
+            <div className={`mt-6 border-t pt-4 ${isDarkMode ? 'border-zinc-800' : 'border-slate-200'}`}>
+                <h4 className={`font-semibold mb-2 flex items-center gap-2 ${isDarkMode ? 'text-zinc-300' : 'text-slate-700'}`}><AlertTriangle className="w-5 h-5 text-red-500"/>Danger Zone</h4>
+                <p className={`text-sm mb-3 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Clearing the queue will remove all pending URLs.</p>
+                <button
+                    onClick={handleClearUrls}
+                    disabled={actionLoading === 'clear' || !queueStatus || queueStatus.queue_size === 0}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50"
+                >
+                    {actionLoading === 'clear' ? <Loader2 className="w-5 h-5 animate-spin" /> : <Trash2 className="w-5 h-5" />}
+                    Clear All URLs
+                </button>
+            </div>
+        </Card>
       </div>
-
-      {/* URL Validation */}
-      {invalidUrls.length > 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <AlertCircle className="w-5 h-5 text-yellow-600" />
-            <span className="text-sm font-medium text-yellow-800">Invalid URLs</span>
-          </div>
-          <div className="space-y-1">
-            {invalidUrls.map((url, index) => (
-              <div key={index} className="text-sm text-yellow-700 font-mono">
-                {url}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
-}; 
+};
+
+const QueueStatItem: React.FC<{label: string, value: number | undefined, color: string, isDarkMode: boolean}> = ({ label, value, color, isDarkMode }) => (
+    <div className={`flex items-center justify-between p-3 rounded-lg bg-${color}-500/10`}>
+        <div className={`font-semibold ${isDarkMode ? `text-${color}-400` : `text-${color}-600`}`}>{label}</div>
+        <div className={`text-lg font-bold ${isDarkMode ? `text-${color}-300` : `text-${color}-600`}`}>{(value ?? 0).toLocaleString()}</div>
+    </div>
+);
+ 
