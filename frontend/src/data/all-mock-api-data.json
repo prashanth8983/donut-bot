@@ -1,0 +1,606 @@
+{
+  "crawlerStatus": {
+    "success": true,
+    "data": {
+      "crawler_running": true,
+      "uptime_seconds": 12456.78,
+      "pages_crawled_total": 1234567,
+      "max_pages_configured": 10000,
+      "pages_remaining_in_limit": 7654,
+      "avg_pages_per_second": 15.8,
+      "frontier_queue_size": 5432,
+      "urls_in_processing": 12,
+      "urls_completed_redis": 1215678,
+      "urls_seen_redis": 2345678,
+      "bloom_filter_items": 3456789,
+      "robots_denied_count": 1234,
+      "total_errors_count": 4021,
+      "active_workers_configured": 4,
+      "current_time_utc": "2024-01-15T16:00:00Z",
+      "allowed_domains": ["northeastern.edu", "nyu.edu", "stanford.edu", "mit.edu", "harvard.edu"]
+    }
+  },
+  "jobs": {
+    "success": true,
+    "data": {
+      "jobs": [
+        {
+          "id": "job-001",
+          "name": "Northeastern University Crawl",
+          "domain": "northeastern.edu",
+          "status": "running",
+          "progress": 67.5,
+          "pages_found": 2345,
+          "errors": 23,
+          "start_time": "2024-01-15T10:30:00Z",
+          "end_time": null,
+          "max_depth": 3,
+          "max_pages": 5000,
+          "scheduled": false,
+          "priority": "high",
+          "description": "Comprehensive crawl of Northeastern University website",
+          "tags": ["education", "university", "research"],
+          "data_size": "45.2 MB",
+          "avg_response_time": "1.2s",
+          "success_rate": 98.9,
+          "created_at": "2024-01-15T10:25:00Z",
+          "updated_at": "2024-01-15T14:30:00Z"
+        },
+        {
+          "id": "job-002",
+          "name": "NYU Academic Pages",
+          "domain": "nyu.edu",
+          "status": "completed",
+          "progress": 100.0,
+          "pages_found": 1890,
+          "errors": 12,
+          "start_time": "2024-01-14T09:00:00Z",
+          "end_time": "2024-01-14T16:45:00Z",
+          "max_depth": 2,
+          "max_pages": 2000,
+          "scheduled": false,
+          "priority": "medium",
+          "description": "Academic department pages crawl",
+          "tags": ["education", "academic"],
+          "data_size": "32.1 MB",
+          "avg_response_time": "0.8s",
+          "success_rate": 99.4,
+          "created_at": "2024-01-14T08:55:00Z",
+          "updated_at": "2024-01-14T16:45:00Z"
+        },
+        {
+          "id": "job-003",
+          "name": "Stanford Research Crawl",
+          "domain": "stanford.edu",
+          "status": "paused",
+          "progress": 34.2,
+          "pages_found": 890,
+          "errors": 45,
+          "start_time": "2024-01-15T08:00:00Z",
+          "end_time": null,
+          "max_depth": 4,
+          "max_pages": 8000,
+          "scheduled": true,
+          "priority": "high",
+          "description": "Research publications and labs crawl",
+          "tags": ["research", "publications", "labs"],
+          "data_size": "18.7 MB",
+          "avg_response_time": "1.5s",
+          "success_rate": 95.1,
+          "created_at": "2024-01-15T07:55:00Z",
+          "updated_at": "2024-01-15T12:30:00Z"
+        },
+        {
+          "id": "job-004",
+          "name": "MIT Engineering",
+          "domain": "mit.edu",
+          "status": "failed",
+          "progress": 12.5,
+          "pages_found": 234,
+          "errors": 156,
+          "start_time": "2024-01-13T14:00:00Z",
+          "end_time": "2024-01-13T15:30:00Z",
+          "max_depth": 3,
+          "max_pages": 3000,
+          "scheduled": false,
+          "priority": "medium",
+          "description": "Engineering department crawl",
+          "tags": ["engineering", "technology"],
+          "data_size": "4.2 MB",
+          "avg_response_time": "2.1s",
+          "success_rate": 60.0,
+          "created_at": "2024-01-13T13:55:00Z",
+          "updated_at": "2024-01-13T15:30:00Z"
+        },
+        {
+          "id": "job-005",
+          "name": "Harvard Library",
+          "domain": "harvard.edu",
+          "status": "queued",
+          "progress": 0.0,
+          "pages_found": 0,
+          "errors": 0,
+          "start_time": null,
+          "end_time": null,
+          "max_depth": 2,
+          "max_pages": 1500,
+          "scheduled": true,
+          "priority": "low",
+          "description": "Library resources crawl",
+          "tags": ["library", "resources"],
+          "data_size": "0 MB",
+          "avg_response_time": "0s",
+          "success_rate": 0.0,
+          "created_at": "2024-01-15T16:00:00Z",
+          "updated_at": "2024-01-15T16:00:00Z"
+        }
+      ],
+      "count": 5,
+      "total": 5,
+      "page": 1,
+      "size": 100
+    }
+  },
+  "metrics_24h": {
+    "success": true,
+    "data": {
+      "pages_crawled": 1234567,
+      "errors": 4021,
+      "robots_denied": 1234,
+      "avg_response_time": 1.2,
+      "cache_hit_rate": 85.5,
+      "pages_crawled_over_time": [1200, 1300, 1100, 900, 950, 1000, 1050, 1200, 1300, 1400, 1350, 1200, 1100, 1000, 950, 900, 850, 800, 950, 1000, 1100, 1200, 1300, 1400],
+      "errors_over_time": [10, 12, 8, 7, 9, 11, 10, 8, 7, 6, 5, 8, 9, 10, 11, 12, 10, 9, 8, 7, 6, 5, 4, 3],
+      "total_data_size": "156.7 MB",
+      "content_type_counts": {
+        "text/html": 45678,
+        "application/json": 12345,
+        "text/plain": 8901,
+        "application/pdf": 2345,
+        "image/jpeg": 5678,
+        "image/png": 3456,
+        "application/xml": 1234,
+        "text/css": 2345,
+        "application/javascript": 3456,
+        "other": 1234
+      },
+      "status_code_counts": {
+        "200": 1234567,
+        "404": 12345,
+        "301": 8901,
+        "302": 5678,
+        "500": 2345,
+        "403": 1234,
+        "other": 567
+      },
+      "queue_size_over_time": [2000, 2100, 2200, 2300, 2400, 2500, 2600, 2700, 2800, 2900, 3000, 3100, 3200, 3300, 3400, 3500, 3600, 3700, 3800, 3900, 4000, 4100, 4200, 4300]
+    }
+  },
+  "metrics_7d": {
+    "success": true,
+    "data": {
+      "pages_crawled": 1234567,
+      "errors": 4021,
+      "robots_denied": 1234,
+      "avg_response_time": 1.2,
+      "cache_hit_rate": 85.5,
+      "pages_crawled_over_time": [9000, 9500, 10000, 11000, 12000, 13000, 14000],
+      "errors_over_time": [80, 90, 85, 70, 75, 60, 55],
+      "total_data_size": "156.7 MB",
+      "content_type_counts": {
+        "text/html": 45678,
+        "application/json": 12345,
+        "text/plain": 8901,
+        "application/pdf": 2345,
+        "image/jpeg": 5678,
+        "image/png": 3456,
+        "application/xml": 1234,
+        "text/css": 2345,
+        "application/javascript": 3456,
+        "other": 1234
+      },
+      "status_code_counts": {
+        "200": 1234567,
+        "404": 12345,
+        "301": 8901,
+        "302": 5678,
+        "500": 2345,
+        "403": 1234,
+        "other": 567
+      },
+      "queue_size_over_time": [2000, 2200, 2400, 2600, 2800, 3000, 3200]
+    }
+  },
+  "metrics_all": {
+    "success": true,
+    "data": {
+      "pages_crawled": 1234567,
+      "errors": 4021,
+      "robots_denied": 1234,
+      "avg_response_time": 1.2,
+      "cache_hit_rate": 85.5,
+      "pages_crawled_over_time": [1000, 1200, 1100, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000, 2100, 2200, 2300, 2400, 2500, 2600, 2700, 2800, 2900, 3000, 3100, 3200, 3300, 3400, 3500, 3600, 3700, 3800, 3900, 4000, 4100, 4200, 4300, 4400, 4500, 4600, 4700, 4800, 4900],
+      "errors_over_time": [10, 12, 8, 7, 9, 11, 10, 8, 7, 6, 5, 8, 9, 10, 11, 12, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+      "total_data_size": "156.7 MB",
+      "content_type_counts": {
+        "text/html": 45678,
+        "application/json": 12345,
+        "text/plain": 8901,
+        "application/pdf": 2345,
+        "image/jpeg": 5678,
+        "image/png": 3456,
+        "application/xml": 1234,
+        "text/css": 2345,
+        "application/javascript": 3456,
+        "other": 1234
+      },
+      "status_code_counts": {
+        "200": 1234567,
+        "404": 12345,
+        "301": 8901,
+        "302": 5678,
+        "500": 2345,
+        "403": 1234,
+        "other": 567
+      },
+      "queue_size_over_time": [2000, 2100, 2200, 2300, 2400, 2500, 2600, 2700, 2800, 2900, 3000, 3100, 3200, 3300, 3400, 3500, 3600, 3700, 3800, 3900, 4000, 4100, 4200, 4300, 4400, 4500, 4600, 4700, 4800, 4900, 5000, 5100, 5200, 5300, 5400, 5500, 5600, 5700, 5800, 5900]
+    }
+  },
+  "queueStatus": {
+    "success": true,
+    "data": {
+      "queue_size": 5432,
+      "processing_count": 12,
+      "completed_count": 1215678,
+      "seen_count": 2345678,
+      "redis_connected": true
+    }
+  },
+  "config": {
+    "success": true,
+    "data": {
+      "workers": 4,
+      "max_depth": 3,
+      "max_pages": 10000,
+      "allowed_domains": ["northeastern.edu", "nyu.edu", "stanford.edu", "mit.edu", "harvard.edu"],
+      "delay": 1.0,
+      "timeout": 30,
+      "user_agent": "DonutBot/1.0",
+      "bloom_capacity": 1000000,
+      "bloom_error_rate": 0.01,
+      "idle_shutdown_threshold": 300,
+      "metrics_interval": 60,
+      "request_timeout": 30,
+      "max_connections": 100,
+      "allow_redirects": true,
+      "respect_robots_txt": true,
+      "robots_cache_time": 3600,
+      "ssl_verification_enabled": true,
+      "max_content_size": 10485760,
+      "excluded_extensions": [".pdf", ".zip", ".exe", ".mp4"],
+      "priority_patterns": ["/research/", "/publications/", "/faculty/"],
+      "allowed_content_types": ["text/html", "application/json", "text/plain"],
+      "rate_limits": {
+        "northeastern.edu": 2.0,
+        "nyu.edu": 1.5,
+        "stanford.edu": 1.0,
+        "mit.edu": 1.0,
+        "harvard.edu": 1.0
+      },
+      "additional_headers": {
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate"
+      }
+    }
+  },
+  "allowedDomains": {
+    "success": true,
+    "data": {
+      "allowed_domains": ["northeastern.edu", "nyu.edu", "stanford.edu", "mit.edu", "harvard.edu"]
+    }
+  },
+  "scheduledJobs": {
+    "success": true,
+    "data": {
+      "scheduled_jobs": [
+        {
+          "id": "sched-001",
+          "name": "Daily Northeastern Crawl",
+          "domain": "northeastern.edu",
+          "status": "enabled",
+          "schedule": "0 2 * * *",
+          "nextRun": "2024-01-16T02:00:00Z",
+          "lastRun": "2024-01-15T02:00:00Z",
+          "priority": "medium",
+          "category": "daily",
+          "config": { "workers": 3, "max_depth": 2, "max_pages": 2000, "delay": 1.5 },
+          "urls": ["https://northeastern.edu", "https://northeastern.edu/research"],
+          "createdAt": "2024-01-01T00:00:00Z",
+          "updatedAt": "2024-01-15T02:00:00Z"
+        },
+        {
+          "id": "sched-002",
+          "name": "Weekly Stanford Research",
+          "domain": "stanford.edu",
+          "status": "enabled",
+          "schedule": "0 3 * * 1",
+          "nextRun": "2024-01-22T03:00:00Z",
+          "lastRun": "2024-01-15T03:00:00Z",
+          "priority": "high",
+          "category": "weekly",
+          "config": { "workers": 4, "max_depth": 3, "max_pages": 5000, "delay": 1.0 },
+          "urls": ["https://stanford.edu/research", "https://stanford.edu/publications"],
+          "createdAt": "2024-01-01T00:00:00Z",
+          "updatedAt": "2024-01-15T03:00:00Z"
+        },
+        {
+          "id": "sched-003",
+          "name": "Monthly Harvard Library",
+          "domain": "harvard.edu",
+          "status": "disabled",
+          "schedule": "0 4 1 * *",
+          "nextRun": "2024-02-01T04:00:00Z",
+          "lastRun": "2024-01-01T04:00:00Z",
+          "priority": "low",
+          "category": "monthly",
+          "config": { "workers": 2, "max_depth": 2, "max_pages": 1000, "delay": 2.0 },
+          "urls": ["https://library.harvard.edu"],
+          "createdAt": "2024-01-01T00:00:00Z",
+          "updatedAt": "2024-01-01T04:00:00Z"
+        }
+      ],
+      "count": 3,
+      "total": 3,
+      "page": 1,
+      "size": 100
+    }
+  },
+  "nextRuns": {
+    "success": true,
+    "data": {
+      "next_runs": [
+        {
+          "job_id": "sched-001",
+          "job_name": "Daily Northeastern Crawl",
+          "next_run": "2024-01-16T02:00:00Z",
+          "schedule": "0 2 * * *"
+        },
+        {
+          "job_id": "sched-002",
+          "job_name": "Weekly Stanford Research",
+          "next_run": "2024-01-22T03:00:00Z",
+          "schedule": "0 3 * * 1"
+        },
+        {
+          "job_id": "sched-003",
+          "job_name": "Monthly Harvard Library",
+          "next_run": "2024-02-01T04:00:00Z",
+          "schedule": "0 4 1 * *"
+        }
+      ],
+      "count": 3
+    }
+  },
+  "health": {
+    "success": true,
+    "data": {
+      "status": "healthy",
+      "service": "donut-bot-api",
+      "timestamp": "2024-01-15T16:00:00Z"
+    }
+  },
+  "kafkaStatus": {
+    "success": true,
+    "data": {
+      "connected": true,
+      "brokers": ["localhost:9092"],
+      "topics": ["raw-documents", "processed-documents"],
+      "consumer_groups": ["crawler-group"],
+      "producer_status": "active",
+      "consumer_status": "active"
+    }
+  },
+  "storageStatus": {
+    "success": true,
+    "data": {
+      "local_storage": {
+        "enabled": true,
+        "directory": "/app/crawler_output",
+        "total_size": "2.3 GB",
+        "file_count": 12345,
+        "last_cleanup": "2024-01-15T00:00:00Z"
+      },
+      "kafka_storage": {
+        "enabled": false,
+        "topic": "raw-documents",
+        "message_count": 0
+      }
+    }
+  },
+  "addUrls": {
+    "success": true,
+    "data": {
+      "added_count": 10,
+      "skipped_count": 2,
+      "invalid_count": 1,
+      "total_processed": 13
+    }
+  },
+  "clearUrls": {
+    "success": true,
+    "data": {
+      "cleared_count": 5432,
+      "message": "URL queue cleared successfully"
+    }
+  },
+  "startCrawler": {
+    "success": true,
+    "data": {
+      "message": "Crawler started successfully"
+    }
+  },
+  "stopCrawler": {
+    "success": true,
+    "data": {
+      "message": "Crawler stopped successfully"
+    }
+  },
+  "pauseCrawler": {
+    "success": true,
+    "data": {
+      "message": "Crawler paused successfully"
+    }
+  },
+  "resumeCrawler": {
+    "success": true,
+    "data": {
+      "message": "Crawler resumed successfully"
+    }
+  },
+  "createJob": {
+    "success": true,
+    "data": {
+      "id": "job-001",
+      "name": "Northeastern University Crawl",
+      "domain": "northeastern.edu",
+      "status": "running",
+      "progress": 67.5,
+      "pages_found": 2345,
+      "errors": 23,
+      "start_time": "2024-01-15T10:30:00Z",
+      "end_time": null,
+      "max_depth": 3,
+      "max_pages": 5000,
+      "scheduled": false,
+      "priority": "high",
+      "description": "Comprehensive crawl of Northeastern University website",
+      "tags": ["education", "university", "research"],
+      "data_size": "45.2 MB",
+      "avg_response_time": "1.2s",
+      "success_rate": 98.9,
+      "created_at": "2024-01-15T10:25:00Z",
+      "updated_at": "2024-01-15T14:30:00Z"
+    }
+  },
+  "updateJob": {
+    "success": true,
+    "data": {
+      "id": "job-001",
+      "name": "Northeastern University Crawl",
+      "domain": "northeastern.edu",
+      "status": "running",
+      "progress": 67.5,
+      "pages_found": 2345,
+      "errors": 23,
+      "start_time": "2024-01-15T10:30:00Z",
+      "end_time": null,
+      "max_depth": 3,
+      "max_pages": 5000,
+      "scheduled": false,
+      "priority": "high",
+      "description": "Comprehensive crawl of Northeastern University website",
+      "tags": ["education", "university", "research"],
+      "data_size": "45.2 MB",
+      "avg_response_time": "1.2s",
+      "success_rate": 98.9,
+      "created_at": "2024-01-15T10:25:00Z",
+      "updated_at": "2024-01-15T14:30:00Z"
+    }
+  },
+  "deleteJob": {
+    "success": true,
+    "data": {
+      "message": "Job deleted successfully"
+    }
+  },
+  "startJob": {
+    "success": true,
+    "data": {
+      "message": "Job started successfully"
+    }
+  },
+  "stopJob": {
+    "success": true,
+    "data": {
+      "message": "Job stopped successfully"
+    }
+  },
+  "pauseJob": {
+    "success": true,
+    "data": {
+      "message": "Job paused successfully"
+    }
+  },
+  "resumeJob": {
+    "success": true,
+    "data": {
+      "message": "Job resumed successfully"
+    }
+  },
+  "createScheduledJob": {
+    "success": true,
+    "data": {
+      "id": "sched-001",
+      "name": "Daily Northeastern Crawl",
+      "domain": "northeastern.edu",
+      "status": "enabled",
+      "schedule": "0 2 * * *",
+      "nextRun": "2024-01-16T02:00:00Z",
+      "lastRun": "2024-01-15T02:00:00Z",
+      "priority": "medium",
+      "category": "daily",
+      "config": { "workers": 3, "max_depth": 2, "max_pages": 2000, "delay": 1.5 },
+      "urls": ["https://northeastern.edu", "https://northeastern.edu/research"],
+      "createdAt": "2024-01-01T00:00:00Z",
+      "updatedAt": "2024-01-15T02:00:00Z"
+    }
+  },
+  "updateScheduledJob": {
+    "success": true,
+    "data": {
+      "id": "sched-001",
+      "name": "Daily Northeastern Crawl",
+      "domain": "northeastern.edu",
+      "status": "enabled",
+      "schedule": "0 2 * * *",
+      "nextRun": "2024-01-16T02:00:00Z",
+      "lastRun": "2024-01-15T02:00:00Z",
+      "priority": "medium",
+      "category": "daily",
+      "config": { "workers": 3, "max_depth": 2, "max_pages": 2000, "delay": 1.5 },
+      "urls": ["https://northeastern.edu", "https://northeastern.edu/research"],
+      "createdAt": "2024-01-01T00:00:00Z",
+      "updatedAt": "2024-01-15T02:00:00Z"
+    }
+  },
+  "deleteScheduledJob": {
+    "success": true,
+    "data": {
+      "message": "Scheduled job deleted successfully"
+    }
+  },
+  "enableScheduledJob": {
+    "success": true,
+    "data": {
+      "message": "Scheduled job enabled successfully"
+    }
+  },
+  "disableScheduledJob": {
+    "success": true,
+    "data": {
+      "message": "Scheduled job disabled successfully"
+    }
+  },
+  "error": {
+    "success": false,
+    "error": "Example error message"
+  },
+  "networkError": {
+    "success": false,
+    "error": "Network error: Failed to fetch"
+  },
+  "serverError": {
+    "success": false,
+    "error": "Internal server error"
+  }
+} 
