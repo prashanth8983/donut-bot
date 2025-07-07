@@ -1,43 +1,53 @@
-import React from 'react';
-import { X, CheckCircle, AlertCircle, Info } from 'lucide-react';
+import React, { useEffect } from 'react';
+import { AlertCircle, CheckCircle, XCircle, Info, X } from 'lucide-react';
+import type { Notification } from '../types';
 
 interface NotificationToastProps {
-  message: string;
-  type: 'success' | 'error' | 'info';
+  notification: Notification;
   onClose: () => void;
 }
 
-export const NotificationToast: React.FC<NotificationToastProps> = ({
-  message,
-  type,
-  onClose,
-}) => {
-  const iconMap = {
-    success: CheckCircle,
-    error: AlertCircle,
-    info: Info,
-  };
+const NotificationToast: React.FC<NotificationToastProps> = ({ notification, onClose }) => {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onClose();
+    }, 5000); // Auto-dismiss after 5 seconds
 
-  const colorClasses = {
-    success: 'bg-green-50 border-green-200 text-green-800',
-    error: 'bg-red-50 border-red-200 text-red-800',
-    info: 'bg-blue-50 border-blue-200 text-blue-800',
-  };
+    return () => clearTimeout(timer);
+  }, [onClose]);
 
-  const Icon = iconMap[type];
+  const getIcon = () => {
+    switch (notification.type) {
+      case 'success':
+        return <CheckCircle className="w-6 h-6 text-green-500" />;
+      case 'error':
+        return <XCircle className="w-6 h-6 text-red-500" />;
+      case 'info':
+      default:
+        return <Info className="w-6 h-6 text-sky-500" />;
+    }
+  };
 
   return (
-    <div className="fixed top-4 right-4 z-50">
-      <div className={`flex items-center p-4 border rounded-lg shadow-lg ${colorClasses[type]}`}>
-        <Icon className="w-5 h-5 mr-3" />
-        <span className="flex-1">{message}</span>
-        <button
-          onClick={onClose}
-          className="ml-3 text-gray-400 hover:text-gray-600"
-        >
-          <X className="w-4 h-4" />
-        </button>
+    <div 
+      className={`flex items-start p-4 w-full max-w-sm bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl rounded-2xl shadow-2xl border dark:border-zinc-800 animate-fade-in-right`}
+    >
+      <div className="flex-shrink-0">
+        {getIcon()}
       </div>
+      <div className="ml-3 flex-1">
+        <p className="text-sm font-semibold text-slate-800 dark:text-zinc-100">{notification.message}</p>
+      </div>
+      <button 
+        onClick={onClose} 
+        className="ml-4 flex-shrink-0 p-1 rounded-full text-slate-400 dark:text-zinc-500 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors"
+      >
+        <X size={18} />
+      </button>
     </div>
   );
-}; 
+};
+
+export default NotificationToast;
+
+ 
