@@ -1,104 +1,133 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { apiService } from '../services/api';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Globe, Loader2, AlertTriangle } from 'lucide-react';
 import { useDashboard } from '../contexts/DashboardContext';
+import Card from './ui/Card';
 
 export const DomainManager: React.FC = () => {
   const [domains, setDomains] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [newDomain, setNewDomain] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
   const { showNotification, isDarkMode } = useDashboard();
 
-  const fetchDomains = async () => {
+  const fetchDomains = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const response = await apiService.getAllowedDomains();
-    if (response.success && response.data) {
-      setDomains(response.data.allowed_domains);
-    } else {
-      setError(response.error || 'Failed to fetch domains');
+    try {
+      const response = await apiService.getAllowedDomains();
+      if (response.success && response.data) {
+        setDomains(response.data.allowed_domains);
+      } else {
+        setError(response.error || 'Failed to fetch domains');
+        showNotification(response.error || 'Failed to fetch domains', 'error');
+      }
+    } catch (err) {
+      const errorMessage = (err as Error).message || 'An unknown error occurred';
+      setError(errorMessage);
+      showNotification(errorMessage, 'error');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  };
+  }, [showNotification]);
 
   useEffect(() => {
     fetchDomains();
-  }, []);
+  }, [fetchDomains]);
 
-  const handleAddDomain = async () => {
+  const handleAddDomain = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!newDomain.trim()) return;
-    const response = await apiService.updateAllowedDomains('add', [newDomain.trim()]);
-    if (response.success) {
-      showNotification('Domain added successfully', 'success');
-      setNewDomain('');
-      fetchDomains();
-    } else {
-      showNotification(`Failed to add domain: ${response.error}`, 'error');
+    setActionLoading(true);
+    try {
+      const response = await apiService.updateAllowedDomains('add', [newDomain.trim()]);
+      if (response.success) {
+        showNotification('Domain added successfully', 'success');
+        setNewDomain('');
+        await fetchDomains();
+      } else {
+        showNotification(`Failed to add domain: ${response.error}`, 'error');
+      }
+    } catch (err) {
+      showNotification(`Failed to add domain: ${(err as Error).message}`, 'error');
+    } finally {
+      setActionLoading(false);
     }
   };
 
   const handleRemoveDomain = async (domain: string) => {
-    const response = await apiService.updateAllowedDomains('remove', [domain]);
-    if (response.success) {
-      showNotification('Domain removed successfully', 'success');
-      fetchDomains();
-    } else {
-      showNotification(`Failed to remove domain: ${response.error}`, 'error');
+    if (window.confirm(`Are you sure you want to remove the domain: ${domain}?`)) {
+        setActionLoading(true);
+        try {
+            const response = await apiService.updateAllowedDomains('remove', [domain]);
+            if (response.success) {
+                showNotification('Domain removed successfully', 'success');
+                await fetchDomains();
+            } else {
+                showNotification(`Failed to remove domain: ${response.error}`, 'error');
+            }
+        } catch (err) {
+            showNotification(`Failed to remove domain: ${(err as Error).message}`, 'error');
+        } finally {
+            setActionLoading(false);
+        }
     }
   };
 
   return (
-    <div className="space-y-6">
-      <div className={`${isDarkMode ? 'bg-stone-800 border-stone-700' : 'bg-white border-gray-200'} p-6 rounded-lg border`}>
-        <h1 className={`text-2xl font-bold ${isDarkMode ? 'text-stone-100' : 'text-gray-900'} mb-2`}>Domain Manager</h1>
-        <p className={`${isDarkMode ? 'text-stone-400' : 'text-gray-600'} mb-4`}>Manage allowed domains for the crawler.</p>
-        <div className="flex gap-2 mb-4">
-          <input
-            type="text"
-            value={newDomain}
-            onChange={e => setNewDomain(e.target.value)}
-            placeholder="Add new domain (e.g. example.com)"
-            className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-              isDarkMode 
-                ? 'border-stone-600 bg-stone-700 text-stone-100 placeholder-stone-400' 
-                : 'border-gray-300 bg-white text-gray-900'
-            }`}
-          />
-          <button
-            onClick={handleAddDomain}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            disabled={!newDomain.trim()}
-          >
-            <Plus className="w-4 h-4" />
-            Add
-          </button>
+    <Card>
+        <div className="flex items-center gap-3 mb-6">
+            <Globe className="w-7 h-7 text-sky-500" />
+            <h2 className={`text-xl font-bold ${isDarkMode ? 'text-zinc-100' : 'text-slate-800'}`}>Allowed Domains</h2>
         </div>
+        <form onSubmit={handleAddDomain} className="flex gap-3 mb-4">
+            <input
+                type="text"
+                value={newDomain}
+                onChange={e => setNewDomain(e.target.value)}
+                placeholder="Add new domain (e.g. example.com)"
+                className={`flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 ${isDarkMode ? 'bg-zinc-800/80 border-zinc-700' : 'bg-white/80 border-slate-300'}`}
+            />
+            <button
+                type="submit"
+                className="flex items-center gap-2 px-4 py-2 bg-sky-500 text-white rounded-lg hover:bg-sky-600 transition-colors shadow-md hover:shadow-lg disabled:opacity-50"
+                disabled={!newDomain.trim() || actionLoading}
+            >
+                {actionLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
+                Add
+            </button>
+        </form>
+        
         {loading ? (
-          <div className={`animate-pulse h-8 ${isDarkMode ? 'bg-stone-600' : 'bg-gray-200'} rounded w-1/2 mb-2`}></div>
+            <div className="text-center py-8"><Loader2 className="w-8 h-8 animate-spin mx-auto text-sky-500" /></div>
         ) : error ? (
-          <div className="text-red-600">{error}</div>
+            <div className="text-center py-8 text-red-500 flex flex-col items-center gap-2">
+                <AlertTriangle className="w-8 h-8" />
+                <p>Error: {error}</p>
+                <button onClick={fetchDomains} className="mt-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600">Retry</button>
+            </div>
         ) : (
-          <ul className={`divide-y ${isDarkMode ? 'divide-stone-600' : 'divide-gray-200'}`}>
-            {domains.length === 0 ? (
-              <li className={`py-4 ${isDarkMode ? 'text-stone-400' : 'text-gray-500'} text-center`}>No domains configured.</li>
-            ) : (
-              domains.map(domain => (
-                <li key={domain} className="flex items-center justify-between py-2">
-                  <span className={`${isDarkMode ? 'text-stone-100' : 'text-gray-900'} font-medium`}>{domain}</span>
-                  <button
-                    onClick={() => handleRemoveDomain(domain)}
-                    className="p-1 text-red-600 hover:text-red-800"
-                    title="Remove domain"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </li>
-              ))
-            )}
-          </ul>
+            <ul className={`divide-y max-h-96 overflow-y-auto pr-2 ${isDarkMode ? 'divide-zinc-800' : 'divide-slate-200'}`}>
+                {domains.length === 0 ? (
+                    <li className={`py-6 text-center ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>No domains configured.</li>
+                ) : (
+                    domains.map(domain => (
+                        <li key={domain} className="flex items-center justify-between py-3 group">
+                            <span className={`font-medium ${isDarkMode ? 'text-zinc-200' : 'text-slate-700'}`}>{domain}</span>
+                            <button
+                                onClick={() => handleRemoveDomain(domain)}
+                                className={`p-2 rounded-full hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-opacity ${isDarkMode ? 'text-zinc-500 hover:text-red-500' : 'text-slate-400 hover:text-red-500'}`}
+                                title="Remove domain"
+                                disabled={actionLoading}
+                            >
+                                <Trash2 className="w-5 h-5" />
+                            </button>
+                        </li>
+                    ))
+                )}
+            </ul>
         )}
-      </div>
-    </div>
+    </Card>
   );
 }; 
