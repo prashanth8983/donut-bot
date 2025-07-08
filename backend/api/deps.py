@@ -41,6 +41,8 @@ async def get_job_service(db: Database = Depends(get_database)):
                 return False
             async def resume_job(self, job_id: str):
                 return False
+            async def pause_job(self, job_id: str):
+                return False
             async def get_job_stats(self):
                 from db.schemas import JobStats
                 return JobStats()
