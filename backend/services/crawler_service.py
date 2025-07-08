@@ -149,6 +149,131 @@ class CrawlerService:
         except Exception as e:
             logger.error(f"Failed to stop crawler: {e}")
             return False
+
+    async def pause_crawler(self) -> bool:
+        """Pause the crawler engine while preserving state."""
+        try:
+            if not self.crawler_engine:
+                logger.warning("Crawler engine not initialized")
+                return True
+            
+            if not self.crawler_engine.running:
+                logger.info("Crawler is not running")
+                return True
+            
+            logger.info("Pausing crawler...")
+            
+            # Stop the crawler engine but preserve state
+            await self.crawler_engine.stop()
+            
+            # Cancel progress tracking task
+            if self.progress_task and not self.progress_task.done():
+                self.progress_task.cancel()
+                try:
+                    await self.progress_task
+                except asyncio.CancelledError:
+                    pass
+            
+            # Mark job as paused if it was running
+            if self.current_job_id and self.job_service:
+                try:
+                    await self.job_service.pause_job(self.current_job_id)
+                    logger.info(f"Marked job {self.current_job_id} as paused")
+                except Exception as e:
+                    logger.error(f"Failed to mark job {self.current_job_id} as paused: {e}")
+            
+            # Don't clear current_job_id - keep it for resume
+            self.crawler_task = None
+            self.progress_task = None
+            
+            logger.info("Crawler paused successfully")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to pause crawler: {e}")
+            return False
+
+    async def resume_crawler(self, job_id: Optional[str] = None) -> bool:
+        """Resume the crawler engine."""
+        try:
+            if not self.crawler_engine:
+                raise CrawlError("Crawler engine not initialized")
+            
+            if self.crawler_engine.running:
+                logger.warning("Crawler is already running")
+                return True
+            
+            # Use provided job_id or current_job_id
+            resume_job_id = job_id or self.current_job_id
+            if not resume_job_id:
+                raise CrawlError("No job ID provided for resume")
+            
+            logger.info(f"Resuming crawler for job: {resume_job_id}")
+            
+            # Mark job as running
+            if self.job_service:
+                try:
+                    await self.job_service.resume_job(resume_job_id)
+                    logger.info(f"Marked job {resume_job_id} as running")
+                except Exception as e:
+                    logger.error(f"Failed to mark job {resume_job_id} as running: {e}")
+            
+            # Update current job ID
+            self.current_job_id = resume_job_id
+            
+            # Start the crawler engine
+            self.crawler_task = asyncio.create_task(self.crawler_engine.run())
+            
+            # Start progress tracking
+            if self.job_service:
+                self.progress_task = asyncio.create_task(self._track_progress(resume_job_id))
+                logger.info(f"Started progress tracking for job: {resume_job_id}")
+            
+            logger.info("Crawler resumed successfully")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to resume crawler: {e}")
+            return False
+
+    async def pause_job(self, job_id: str) -> bool:
+        """Pause a specific job and its associated crawler."""
+        try:
+            if not self.job_service:
+                raise CrawlError("Job service not initialized")
+            
+            # Check if this is the current job
+            if self.current_job_id != job_id:
+                # If it's not the current job, just update the job status
+                await self.job_service.pause_job(job_id)
+                logger.info(f"Paused job {job_id} (not currently running)")
+                return True
+            
+            # If it's the current job, pause the crawler too
+            logger.info(f"Pausing current job and crawler: {job_id}")
+            return await self.pause_crawler()
+            
+        except Exception as e:
+            logger.error(f"Failed to pause job {job_id}: {e}")
+            return False
+
+    async def resume_job(self, job_id: str) -> bool:
+        """Resume a specific job and its associated crawler."""
+        try:
+            if not self.job_service:
+                raise CrawlError("Job service not initialized")
+            
+            # Check if crawler is already running
+            if self.crawler_engine and self.crawler_engine.running:
+                logger.warning("Crawler is already running")
+                return False
+            
+            logger.info(f"Resuming job and crawler: {job_id}")
+            return await self.resume_crawler(job_id)
+            
+        except Exception as e:
+            logger.error(f"Failed to resume job {job_id}: {e}")
+            return False
     
     async def get_status(self) -> Dict[str, Any]:
         """Get current crawler status."""
