@@ -23,11 +23,11 @@ class Settings(BaseSettings):
     port: int = Field(8089, env="PORT")
     
     # Database
-    mongo_uri: str = Field(..., env="MONGO_URI") # This should always come from env
-    database_name: str = Field("webcrawler", env="DATABASE_NAME")
+    mongo_uri: str = Field("mongodb://localhost:27017/donut_bot", env="MONGO_URI")
+    database_name: str = Field("donut_bot", env="DATABASE_NAME")
     
     # Redis
-    redis_host: str = Field("redis", env="REDIS_HOST")
+    redis_host: str = Field("localhost", env="REDIS_HOST")
     redis_port: int = Field(6379, env="REDIS_PORT")
     redis_db: int = Field(0, env="REDIS_DB")
     
@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     default_allowed_domains: List[str] = Field(["northeastern.edu", "nyu.edu", "stanford.edu", "mit.edu"], env="DEFAULT_ALLOWED_DOMAINS")
     
     # Security
-    secret_key: str = Field(..., env="SECRET_KEY") # This should always come from env
+    secret_key: str = Field("dev-secret-key-change-in-production", env="SECRET_KEY")
     access_token_expire_minutes: int = Field(30, env="ACCESS_TOKEN_EXPIRE_MINUTES")
     
     # CORS
