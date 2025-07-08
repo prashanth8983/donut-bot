@@ -5,7 +5,7 @@ Main router for all v1 API endpoints.
 
 from fastapi import APIRouter
 
-from .endpoints import crawler, urls, config, metrics, health, scheduler, jobs
+from .endpoints import crawler, urls, config, metrics, health, scheduler, jobs, results, stats
 
 # Create main router
 api_router = APIRouter()
@@ -17,4 +17,6 @@ api_router.include_router(config.router, prefix="/config", tags=["config"])
 api_router.include_router(metrics.router, prefix="/metrics", tags=["metrics"])
 api_router.include_router(health.router, prefix="/health", tags=["health"])
 api_router.include_router(scheduler.router, prefix="/scheduler", tags=["scheduler"])
-api_router.include_router(jobs.router, prefix="/jobs", tags=["jobs"]) 
+api_router.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
+api_router.include_router(results.router, prefix="/results", tags=["results"])
+api_router.include_router(stats.router, prefix="/stats", tags=["stats"]) 
