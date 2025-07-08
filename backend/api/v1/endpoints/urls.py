@@ -59,6 +59,11 @@ async def get_url_queue_status(
         )
 
 
+@router.get("/queue/", include_in_schema=False)
+async def get_url_queue_status_slash(url_service: URLService = Depends(get_url_service)):
+    return await get_url_queue_status(url_service)
+
+
 @router.delete("/clear", status_code=status.HTTP_200_OK)
 async def clear_url_queue(
     url_service: URLService = Depends(get_url_service)
@@ -90,11 +95,6 @@ async def get_urls(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
         )
-
-
-@router.get("/queue/", include_in_schema=False)
-async def get_url_queue_status_slash(url_service: URLService = Depends(get_url_service)):
-    return await get_url_queue_status(url_service)
 
 
 @router.get("/urls/", include_in_schema=False)
