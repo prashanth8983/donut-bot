@@ -88,7 +88,7 @@ async def stop_crawler(crawler_service: CrawlerService = Depends(get_crawler_ser
 async def pause_crawler(crawler_service: CrawlerService = Depends(get_crawler_service)):
     """Pause the crawler."""
     try:
-        success = await crawler_service.stop_crawler()
+        success = await crawler_service.pause_crawler()
         if success:
             return {"message": "Crawler paused successfully"}
         else:
@@ -111,7 +111,7 @@ async def resume_crawler(
 ):
     """Resume the crawler."""
     try:
-        success = await crawler_service.start_crawler(job_id=job_id)
+        success = await crawler_service.resume_crawler(job_id=job_id)
         if success:
             message = "Crawler resumed successfully"
             if job_id:
