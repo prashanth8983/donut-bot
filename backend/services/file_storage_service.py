@@ -6,7 +6,7 @@ Handles saving crawl data to local file system.
 import json
 import os
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 import hashlib
@@ -204,6 +204,201 @@ class FileStorageService:
         except Exception as e:
             logger.error(f"Error getting storage stats: {e}")
             return {"enabled": self.enabled, "error": str(e)}
+
+    async def get_results(
+        self, 
+        page: int = 1, 
+        size: int = 100, 
+        job_id: Optional[str] = None, 
+        domain: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Get crawl results with pagination and filtering.
+        
+        Args:
+            page: Page number (1-based)
+            size: Page size
+            job_id: Filter by job ID
+            domain: Filter by domain
+            
+        Returns:
+            Dictionary with results data and pagination info
+        """
+        if not self.enabled:
+            return {"data": [], "total": 0, "pages": 0}
+        
+        try:
+            documents_dir = self.output_dir / "documents"
+            if not documents_dir.exists():
+                return {"data": [], "total": 0, "pages": 0}
+            
+            # Collect all JSON files
+            all_files = list(documents_dir.glob("**/*.json"))
+            results = []
+            
+            for file_path in all_files:
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                    
+                    # Apply filters
+                    if job_id and data.get("job_name") != job_id:
+                        continue
+                    if domain and data.get("domain") != domain:
+                        continue
+                    
+                    # Add file path info
+                    data["file_path"] = str(file_path)
+                    results.append(data)
+                    
+                except Exception as e:
+                    logger.error(f"Error reading file {file_path}: {e}")
+                    continue
+            
+            # Sort by timestamp (newest first)
+            results.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+            
+            # Apply pagination
+            total = len(results)
+            start_idx = (page - 1) * size
+            end_idx = start_idx + size
+            paginated_results = results[start_idx:end_idx]
+            
+            return {
+                "data": paginated_results,
+                "total": total,
+                "pages": (total + size - 1) // size
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting results: {e}")
+            return {"data": [], "total": 0, "pages": 0}
+
+    async def get_result_by_hash(self, url_hash: str) -> Optional[Dict[str, Any]]:
+        """
+        Get a specific result by URL hash.
+        
+        Args:
+            url_hash: Hash of the URL to find
+            
+        Returns:
+            Result data or None if not found
+        """
+        if not self.enabled:
+            return None
+        
+        try:
+            documents_dir = self.output_dir / "documents"
+            if not documents_dir.exists():
+                return None
+            
+            # Search through all JSON files
+            for file_path in documents_dir.glob("**/*.json"):
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                    
+                    # Check if this file contains the URL hash
+                    if url_hash in str(file_path) or url_hash in data.get("url", ""):
+                        data["file_path"] = str(file_path)
+                        return data
+                        
+                except Exception as e:
+                    logger.error(f"Error reading file {file_path}: {e}")
+                    continue
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting result by hash {url_hash}: {e}")
+            return None
+
+    async def clear_results(self, job_id: Optional[str] = None) -> Dict[str, int]:
+        """
+        Clear crawl results.
+        
+        Args:
+            job_id: Clear results for specific job ID, or all if None
+            
+        Returns:
+            Dictionary with deletion statistics
+        """
+        if not self.enabled:
+            return {"deleted_count": 0}
+        
+        try:
+            documents_dir = self.output_dir / "documents"
+            if not documents_dir.exists():
+                return {"deleted_count": 0}
+            
+            deleted_count = 0
+            
+            # Delete files based on job_id filter
+            for file_path in documents_dir.glob("**/*.json"):
+                try:
+                    if job_id:
+                        # Check if file belongs to the specified job
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            data = json.load(f)
+                        if data.get("job_name") != job_id:
+                            continue
+                    
+                    file_path.unlink()
+                    deleted_count += 1
+                    
+                except Exception as e:
+                    logger.error(f"Error deleting file {file_path}: {e}")
+                    continue
+            
+            logger.info(f"Cleared {deleted_count} result files")
+            return {"deleted_count": deleted_count}
+            
+        except Exception as e:
+            logger.error(f"Error clearing results: {e}")
+            return {"deleted_count": 0}
+
+    async def get_results_stats(self) -> Dict[str, Any]:
+        """
+        Get results statistics.
+        
+        Returns:
+            Dictionary with results statistics
+        """
+        if not self.enabled:
+            return {"total_results": 0, "total_size_bytes": 0, "domains": []}
+        
+        try:
+            documents_dir = self.output_dir / "documents"
+            if not documents_dir.exists():
+                return {"total_results": 0, "total_size_bytes": 0, "domains": []}
+            
+            total_results = 0
+            total_size = 0
+            domains = set()
+            
+            for file_path in documents_dir.glob("**/*.json"):
+                try:
+                    total_results += 1
+                    total_size += file_path.stat().st_size
+                    
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                    if data.get("domain"):
+                        domains.add(data["domain"])
+                        
+                except Exception as e:
+                    logger.error(f"Error reading file {file_path}: {e}")
+                    continue
+            
+            return {
+                "total_results": total_results,
+                "total_size_bytes": total_size,
+                "domains": list(domains)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting results stats: {e}")
+            return {"total_results": 0, "total_size_bytes": 0, "domains": []}
     
     async def cleanup_old_files(self, max_age_days: int = 30) -> Dict[str, int]:
         """
