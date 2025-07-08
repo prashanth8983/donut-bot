@@ -404,6 +404,43 @@ class JobService:
         except Exception as e:
             logger.error(f"Failed to resume job {job_id}: {e}")
             raise DatabaseError(f"Failed to resume job: {str(e)}")
+
+    async def pause_job(self, job_id: str) -> bool:
+        """Pause a running job."""
+        try:
+            job = await self.get_job_by_id(job_id)
+            if not job:
+                raise JobNotFoundError(f"Job not found: {job_id}")
+            
+            if job.status != "running":
+                raise InvalidJobStateError(f"Job is not running (current status: {job.status})")
+            
+            now = datetime.now(timezone.utc)
+            # Calculate elapsed_seconds
+            elapsed = job.elapsed_seconds or 0
+            if job.start_time:
+                elapsed += int((now - job.start_time).total_seconds())
+            update_data = {
+                "status": "paused",
+                "end_time": now,
+                "updated_at": now,
+                "elapsed_seconds": elapsed
+            }
+            result = await self.collection.update_one(
+                {"_id": ObjectId(job_id)},
+                {"$set": update_data}
+            )
+            if result.modified_count > 0:
+                logger.info(f"Paused job: {job.name} (ID: {job_id})")
+                return True
+            logger.warning(f"Failed to update job status for {job_id}")
+            return False
+            
+        except (JobNotFoundError, InvalidJobStateError):
+            raise
+        except Exception as e:
+            logger.error(f"Failed to pause job {job_id}: {e}")
+            raise DatabaseError(f"Failed to pause job: {str(e)}")
     
     async def get_job_stats(self) -> JobStats:
         """Get job statistics."""
