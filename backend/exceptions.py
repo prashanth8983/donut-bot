@@ -83,3 +83,8 @@ class ServiceError(Exception):
 class KafkaError(DonutBotException):
     """Exception raised when Kafka operations fail."""
     pass 
+
+
+class RedisError(Exception):
+    """Raised when Redis operations fail."""
+    pass 
