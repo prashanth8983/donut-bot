@@ -1,25 +1,18 @@
-"""
-Common utilities for the donut-bot backend.
-Includes helper functions used across the application.
-"""
+"""Utility functions for the backend."""
 
-import datetime
-from typing import Any, Dict, List, Union
+from datetime import datetime, timezone
+from typing import Any, Dict, Union
 
 
 def convert_datetimes(obj: Any) -> Any:
-    """
-    Recursively convert datetime objects to ISO format strings.
-    Used for JSON serialization of response data.
-    """
-    if isinstance(obj, dict):
+    """Convert datetime objects to ISO format strings."""
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    elif isinstance(obj, dict):
         return {k: convert_datetimes(v) for k, v in obj.items()}
     elif isinstance(obj, list):
-        return [convert_datetimes(i) for i in obj]
-    elif isinstance(obj, datetime.datetime):
-        return obj.isoformat()
-    else:
-        return obj
+        return [convert_datetimes(item) for item in obj]
+    return obj
 
 
 def normalize_url(url: str) -> str:
@@ -56,13 +49,18 @@ def safe_get(dictionary: Dict[str, Any], key: str, default: Any = None) -> Any:
     return dictionary.get(key, default)
 
 
-def format_bytes(bytes_value: float) -> str:
-    """Format bytes to human readable format."""
-    for unit in ['B', 'KB', 'MB', 'GB']:
-        if bytes_value < 1024.0:
-            return f"{bytes_value:.1f} {unit}"
-        bytes_value /= 1024.0
-    return f"{bytes_value:.1f} TB"
+def format_file_size(size_bytes: int) -> str:
+    """Format file size in human readable format."""
+    if size_bytes == 0:
+        return "0 B"
+    
+    size_names = ["B", "KB", "MB", "GB", "TB"]
+    i = 0
+    while size_bytes >= 1024 and i < len(size_names) - 1:
+        size_bytes /= 1024.0
+        i += 1
+    
+    return f"{size_bytes:.1f} {size_names[i]}"
 
 
 def format_duration(seconds: float) -> str:
