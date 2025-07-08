@@ -469,6 +469,12 @@ class CrawlerEngine:
         """Stop the crawler engine."""
         logger.info("Stopping crawler engine...")
         self.running = False
+        
+        # Ensure all workers are properly stopped
+        if hasattr(self, 'workers') and self.workers:
+            for worker in self.workers:
+                if hasattr(worker, 'cancel'):
+                    worker.cancel()
 
     async def get_status(self) -> Dict[str, Any]:
         """Get current crawler status."""
