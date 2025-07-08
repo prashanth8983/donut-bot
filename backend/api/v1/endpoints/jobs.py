@@ -13,6 +13,8 @@ from services.job_service import JobService
 from exceptions import JobNotFoundError, JobAlreadyExistsError, InvalidJobStateError, DatabaseError
 from core.logger import get_logger
 from api.deps import get_job_service
+from services.crawler_service import CrawlerService
+from api.deps import get_crawler_service
 
 logger = get_logger("jobs_api")
 router = APIRouter()
@@ -242,11 +244,13 @@ async def stop_job(
 @router.post("/{job_id}/resume", status_code=status.HTTP_200_OK)
 async def resume_job(
     job_id: str,
-    job_service: JobService = Depends(get_job_service)
+    job_service: JobService = Depends(get_job_service),
+    crawler_service: CrawlerService = Depends(get_crawler_service)
 ):
     """Resume a job."""
     try:
-        success = await job_service.resume_job(job_id)
+        # Use crawler service to handle job resume (coordinates with crawler state)
+        success = await crawler_service.resume_job(job_id)
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -275,11 +279,13 @@ async def resume_job(
 @router.post("/{job_id}/pause", status_code=status.HTTP_200_OK)
 async def pause_job(
     job_id: str,
-    job_service: JobService = Depends(get_job_service)
+    job_service: JobService = Depends(get_job_service),
+    crawler_service: CrawlerService = Depends(get_crawler_service)
 ):
     """Pause a running job."""
     try:
-        success = await job_service.pause_job(job_id)
+        # Use crawler service to handle job pause (coordinates with crawler state)
+        success = await crawler_service.pause_job(job_id)
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
