@@ -284,7 +284,15 @@ class CrawlerService:
             }
         
         try:
-            return await self.crawler_engine.get_status()
+            status = await self.crawler_engine.get_status()
+            
+            # Add Redis connection status
+            if self.crawler_engine.url_frontier:
+                status['redis_connected'] = await self.crawler_engine.url_frontier.is_connected()
+            else:
+                status['redis_connected'] = False
+                
+            return status
         except Exception as e:
             logger.error(f"Error getting crawler status: {e}")
             return {
