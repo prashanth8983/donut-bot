@@ -7,14 +7,14 @@ logger = get_logger("mongodb_client")
 
 class MongoDBClient:
     def __init__(self):
-        self.client: AsyncIOMotorClient = None
+        self.client: AsyncIOMotorClient | None = None
         self.db = None
 
     async def connect(self):
         try:
-            self.client = AsyncIOMotorClient(settings.mongodb_uri)
+            self.client = AsyncIOMotorClient(settings.mongo_uri)
             await self.client.admin.command('ping')
-            self.db = self.client[settings.mongodb_db_name]
+            self.db = self.client[settings.database_name]
             logger.info("Successfully connected to MongoDB.")
         except ConnectionFailure as e:
             logger.error(f"MongoDB connection failed: {e}")
