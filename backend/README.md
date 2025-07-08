@@ -136,6 +136,22 @@ backend/
 - **mongodb.py** - MongoDB-specific operations and utilities
 - **schemas.py** - Pydantic models for data validation and serialization
 
+## Recent Updates
+
+### Redis Cache Bug Fix (Latest)
+- **Fixed pause/resume functionality**: Jobs can now be paused and resumed without losing progress
+- **Added missing `pause_job` method**: Resolved AttributeError in job service
+- **Enhanced crawler service**: Added proper state preservation during pause/resume operations
+- **Improved Redis configuration**: Updated to use localhost for development
+- **Better error handling**: Added Redis connection status checks and error classes
+
+### API Implementation
+- **Complete API coverage**: All frontend endpoints now implemented
+- **Results API**: Added endpoint for retrieving crawled data
+- **Stats API**: Added endpoint for crawler statistics
+- **Enhanced file storage**: Added methods for results and stats retrieval
+- **Integration testing**: Comprehensive test suite for frontend-backend communication
+
 ## Features
 
 ### Core Crawler Features
