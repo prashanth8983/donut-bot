@@ -227,6 +227,16 @@ class URLFrontier:
             logger.error(f"URL Frontier: Error getting seen count: {e}")
             return 0
 
+    async def is_connected(self) -> bool:
+        """Check if Redis connection is established."""
+        try:
+            if self.redis:
+                await self.redis.ping()
+                return True
+            return False
+        except Exception:
+            return False
+
     async def clear_all_frontier_data(self):
         """Clear all frontier data."""
         if not self.redis:
