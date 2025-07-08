@@ -45,9 +45,18 @@ async def get_statistics(
         )
 
 
+@router.get("/stats", include_in_schema=False)
+async def get_stats_no_slash(metrics_service: MetricsService = Depends(get_metrics_service)):
+    """Get comprehensive statistics (no slash version)."""
+    return await get_statistics(metrics_service)
+
+
 @router.get("", include_in_schema=False)
-async def get_metrics_no_slash(metrics_service: MetricsService = Depends(get_metrics_service)):
-    return await get_metrics(metrics_service)
+async def get_metrics_no_slash(
+    time_range: str = "24h",
+    metrics_service: MetricsService = Depends(get_metrics_service)
+):
+    return await get_metrics(time_range, metrics_service)
 
 
 @router.get("/stats/", include_in_schema=False)
