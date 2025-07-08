@@ -8,6 +8,7 @@ import sys
 from typing import Any, Dict
 
 from config import settings
+import structlog
 
 
 def setup_logger(name: str = "donut-bot") -> logging.Logger:
@@ -44,9 +45,30 @@ def setup_logger(name: str = "donut-bot") -> logging.Logger:
     return logger
 
 
-def get_logger(name: str) -> logging.Logger:
-    """Get a logger instance with the given name."""
-    return logging.getLogger(f"donut-bot.{name}")
+def get_logger(name: str) -> structlog.BoundLogger:
+    """Get a structured logger instance."""
+    return structlog.get_logger(name)
+
+
+def configure_logging(level: str = "INFO"):
+    """Configure structured logging."""
+    structlog.configure(
+        processors=[
+            structlog.stdlib.filter_by_level,
+            structlog.stdlib.add_logger_name,
+            structlog.stdlib.add_log_level,
+            structlog.stdlib.PositionalArgumentsFormatter(),
+            structlog.processors.TimeStamper(fmt="iso"),
+            structlog.processors.StackInfoRenderer(),
+            structlog.processors.format_exc_info,
+            structlog.processors.UnicodeDecoder(),
+            structlog.processors.JSONRenderer()
+        ],
+        context_class=dict,
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
+        cache_logger_on_first_use=True,
+    )
 
 
 # Create default logger
