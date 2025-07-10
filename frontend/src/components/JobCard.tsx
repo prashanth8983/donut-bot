@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Play, Pause, Square, Trash2, Eye, MoreVertical, AlertCircle, CheckCircle, Clock, FileText, AlertTriangle, TrendingUp, Globe } from 'lucide-react';
+import { Play, Pause, Square, Trash2, AlertCircle, CheckCircle, Clock, FileText, AlertTriangle, TrendingUp, Globe } from 'lucide-react';
 import type { CrawlJob } from '../types';
 import { useDashboard } from '../contexts/DashboardContext';
 

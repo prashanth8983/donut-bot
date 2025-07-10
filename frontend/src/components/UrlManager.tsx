@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Plus, Trash2, Upload, Download, AlertTriangle, Loader2, Link as LinkIcon, CheckCircle, XCircle } from 'lucide-react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import { Plus, Trash2, Upload, AlertTriangle, Loader2, Link as LinkIcon, CheckCircle, XCircle } from 'lucide-react';
 import { apiService } from '../services/api';
 import type { QueueStatus } from '../types';
 import { useDashboard } from '../contexts/DashboardContext';
@@ -8,19 +8,19 @@ import Card from './ui/Card';
 export const UrlManager: React.FC = () => {
   const { showNotification, isDarkMode } = useDashboard();
   const [queueStatus, setQueueStatus] = useState<QueueStatus | null>(null);
+  const [loading, setLoading] = useState(false);
   const [newUrls, setNewUrls] = useState('');
-  const [actionLoading, setActionLoading] = useState<'add' | 'clear' | null>(null);
 
   const fetchQueueStatus = useCallback(async () => {
     try {
       const response = await apiService.getQueueStatus();
       if (response.success) {
-        setQueueStatus(response.data || null);
+        setQueueStatus(response.data!);
       } else {
-        showNotification(`Failed to fetch queue status: ${response.error}`, 'error');
+        showNotification('Failed to load queue status', 'error');
       }
-    } catch (error: unknown) {
-      showNotification(`Failed to fetch queue status: ${(error as Error).message || String(error)}`, 'error');
+    } catch (error) {
+      showNotification('Failed to load queue status', 'error');
     }
   }, [showNotification]);
 
@@ -34,6 +34,7 @@ export const UrlManager: React.FC = () => {
     const urls = newUrls.split('\n').map(url => url.trim()).filter(Boolean);
     const valid: string[] = [];
     const invalid: string[] = [];
+    
     urls.forEach(url => {
       try {
         new URL(url);
@@ -42,12 +43,13 @@ export const UrlManager: React.FC = () => {
         invalid.push(url);
       }
     });
+    
     return { validUrls: valid, invalidUrls: invalid };
   }, [newUrls]);
 
   const handleAddUrls = async () => {
     if (validUrls.length === 0) return;
-    setActionLoading('add');
+    setLoading(true);
     try {
       const response = await apiService.addUrls(validUrls);
       if (response.success) {
@@ -60,13 +62,13 @@ export const UrlManager: React.FC = () => {
     } catch (error: unknown) {
       showNotification(`Failed to add URLs: ${(error as Error).message || String(error)}`, 'error');
     } finally {
-      setActionLoading(null);
+      setLoading(false);
     }
   };
 
   const handleClearUrls = async () => {
     if (!window.confirm('Are you sure you want to clear all URLs from the queue? This action cannot be undone.')) return;
-    setActionLoading('clear');
+    setLoading(true);
     try {
       const response = await apiService.clearUrls();
       if (response.success) {
@@ -78,7 +80,7 @@ export const UrlManager: React.FC = () => {
     } catch (error: unknown) {
       showNotification(`Failed to clear URLs: ${(error as Error).message || String(error)}`, 'error');
     } finally {
-      setActionLoading(null);
+      setLoading(false);
     }
   };
 
@@ -86,7 +88,9 @@ export const UrlManager: React.FC = () => {
     const file = event.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (e) => setNewUrls(e.target?.result as string);
+    reader.onload = (e) => {
+      setNewUrls(e.target?.result as string);
+    };
     reader.readAsText(file);
   };
 
@@ -118,10 +122,10 @@ export const UrlManager: React.FC = () => {
                     </label>
                     <button
                         onClick={handleAddUrls}
-                        disabled={actionLoading === 'add' || validUrls.length === 0}
+                        disabled={loading || validUrls.length === 0}
                         className="flex items-center gap-2 px-4 py-2 bg-sky-500 text-white rounded-lg hover:bg-sky-600 transition-colors shadow-md hover:shadow-lg disabled:opacity-50"
                     >
-                        {actionLoading === 'add' ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
+                        {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
                         Add URLs
                     </button>
                 </div>
@@ -142,10 +146,10 @@ export const UrlManager: React.FC = () => {
                 <p className={`text-sm mb-3 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Clearing the queue will remove all pending URLs.</p>
                 <button
                     onClick={handleClearUrls}
-                    disabled={actionLoading === 'clear' || !queueStatus || queueStatus.queue_size === 0}
+                    disabled={loading || !queueStatus || queueStatus.queue_size === 0}
                     className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50"
                 >
-                    {actionLoading === 'clear' ? <Loader2 className="w-5 h-5 animate-spin" /> : <Trash2 className="w-5 h-5" />}
+                    {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Trash2 className="w-5 h-5" />}
                     Clear All URLs
                 </button>
             </div>

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { AlertCircle, CheckCircle, XCircle, Info, X } from 'lucide-react';
+import { CheckCircle, XCircle, Info, X } from 'lucide-react';
 import type { Notification } from '../types';
 
 interface NotificationToastProps {

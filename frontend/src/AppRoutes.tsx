@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import DashboardPage from './pages/DashboardPage';
 import JobsPage from './pages/JobsPage';
@@ -50,8 +50,6 @@ const AppRoutes: React.FC = () => {
       />
       <div className={`flex-1 flex flex-col overflow-hidden sidebar-transition ${isSidebarMinimized ? 'lg:ml-20' : 'lg:ml-60'}`}>
         <Header
-          isSidebarMinimized={isSidebarMinimized}
-          setIsSidebarMinimized={setIsSidebarMinimized}
           onMobileNavOpen={() => setIsSidebarOpen(true)}
         />
         <main className="flex-1 overflow-y-auto p-4 sm:p-6">

@@ -65,7 +65,7 @@ export const CrawlerControls: React.FC = () => {
   const handleStop = () => handleAction('stop', apiService.stopCrawler);
   const handleReset = () => {
     if (window.confirm('Are you sure you want to reset the crawler? This will clear all queues and data.')) {
-      handleAction('reset', () => apiService.resetCrawler({ redis_all: true }));
+      handleAction('reset', () => apiService.resetCrawler({ redis_completed: true, redis_seen: true, redis_processing: true, redis_queue: true, bloom_filter: true }));
     }
   };
 

@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Settings, Save, RefreshCw, Plus, Trash2, AlertTriangle, SlidersHorizontal, Globe, Cpu, Loader2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Settings, Save, RefreshCw, AlertTriangle, SlidersHorizontal, Cpu, Loader2 } from 'lucide-react';
 import { apiService } from '../services/api';
 import type { CrawlerConfig } from '../types';
 import { useDashboard } from '../contexts/DashboardContext';
@@ -8,7 +8,7 @@ import Card from './ui/Card';
 interface TabButtonProps {
   id: string;
   label: string;
-  icon: React.ReactElement;
+  icon: React.ReactElement<{ className?: string }>;
   activeTab: string;
   setActiveTab: (id: string) => void;
 }
@@ -20,7 +20,7 @@ export const ConfigurationPanel: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('general');
 
-  const fetchConfig = useCallback(async () => {
+  const fetchConfig = async () => {
     setLoading(true);
     try {
       const response = await apiService.getConfig();
@@ -34,11 +34,11 @@ export const ConfigurationPanel: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [showNotification]);
+  };
 
   useEffect(() => {
     fetchConfig();
-  }, [fetchConfig]);
+  }, []);
 
   const handleSaveConfig = async () => {
     setSaving(true);

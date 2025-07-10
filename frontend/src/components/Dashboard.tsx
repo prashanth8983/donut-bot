@@ -3,7 +3,6 @@ import StatCard from './ui/StatCard';
 import ChartCard from './ui/ChartCard';
 import { 
     Globe, 
-    BarChart3, 
     AlertTriangle, 
     Loader, 
     Search, 
@@ -11,7 +10,6 @@ import {
     Zap, 
     CheckCircle, 
     PieChart as PieChartIcon, 
-    AreaChart as AreaChartIcon, 
     TrendingUp,
     Activity,
     Briefcase
@@ -32,91 +30,67 @@ import {
     ResponsiveContainer 
 } from 'recharts';
 import { useDashboard } from '../contexts/DashboardContext';
-import type { CrawlJob, CrawlerStatus, Metrics, QueueStatus } from '../types';
-import { createMockApiService } from '../data/mockApiData';
-
-// Add missing interface
-interface JobStatsOverview {
-    status_distribution: Record<string, number>;
-    top_domains_by_pages: { domain: string; pages: number }[];
-}
-
-const mockApiService = createMockApiService();
+import { apiService } from '../services/api';
+import type { CrawlerStatus, Metrics, QueueStatus, CrawlJob } from '../types';
 
 const formatNumber = (num: number): string => {
-    if (num >= 1_000_000_000) return (num / 1_000_000_000).toFixed(1).replace(/\.0$/, '') + 'B';
-    if (num >= 1_000_000) return (num / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
-    if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
-    return num.toLocaleString();
+    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
+    if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
+    return num.toString();
 };
 
-const Dashboard: React.FC = () => {
-    const { isDarkMode } = useDashboard();
+export const Dashboard: React.FC = () => {
+    const { isDarkMode, showNotification } = useDashboard();
+    const [isMounted, setIsMounted] = useState(false);
     const [crawlerStatus, setCrawlerStatus] = useState<CrawlerStatus | null>(null);
     const [metrics, setMetrics] = useState<Metrics | null>(null);
     const [queueStatus, setQueueStatus] = useState<QueueStatus | null>(null);
-    const [jobStats, setJobStats] = useState<JobStatsOverview | null>(null);
-    const [activeJobs, setActiveJobs] = useState<CrawlJob[]>([]);
+    const [jobs, setJobs] = useState<CrawlJob[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [timeRange, setTimeRange] = useState('24H');
-    const [isMounted, setIsMounted] = useState(false);
+
     useEffect(() => { setIsMounted(true); }, []);
 
     const fetchData = useCallback(async () => {
         try {
             const [crawlerStatusRes, metricsRes, queueStatusRes, jobsRes] = await Promise.all([
-                mockApiService.getCrawlerStatus(),
-                mockApiService.getMetrics('24h'),
-                mockApiService.getQueueStatus(),
-                mockApiService.getJobs(),
+                apiService.getCrawlerStatus(),
+                apiService.getMetrics('24h'),
+                apiService.getQueueStatus(),
+                apiService.getJobs()
             ]);
-            if (crawlerStatusRes.success) setCrawlerStatus(crawlerStatusRes.data);
-            if (metricsRes.success) setMetrics(metricsRes.data);
-            if (queueStatusRes.success) setQueueStatus(queueStatusRes.data);
-            if (jobsRes.success) {
-                const jobs = jobsRes.data.jobs;
-                setActiveJobs(jobs.filter((j: CrawlJob) => j.status === 'running'));
-                // Create job stats from jobs data
-                const statusDistribution = jobs.reduce((acc: Record<string, number>, job: CrawlJob) => {
-                    acc[job.status] = (acc[job.status] || 0) + 1;
-                    return acc;
-                }, {} as Record<string, number>);
-                const topDomains = jobs
-                    .reduce((acc: { domain: string; pages: number }[], job: CrawlJob) => {
-                        const existing = acc.find(d => d.domain === job.domain);
-                        if (existing) {
-                            existing.pages += job.pages_found;
-                        } else {
-                            acc.push({ domain: job.domain, pages: job.pages_found });
-                        }
-                        return acc;
-                    }, [] as { domain: string; pages: number }[])
-                    .sort((a: { domain: string; pages: number }, b: { domain: string; pages: number }) => b.pages - a.pages)
-                    .slice(0, 5);
-                setJobStats({ status_distribution: statusDistribution, top_domains_by_pages: topDomains });
-            }
+
+            if (crawlerStatusRes.success) setCrawlerStatus(crawlerStatusRes.data!);
+            if (metricsRes.success) setMetrics(metricsRes.data!);
+            if (queueStatusRes.success) setQueueStatus(queueStatusRes.data!);
+            if (jobsRes.success) setJobs(jobsRes.data!.jobs);
         } catch (error) {
-            console.error("Failed to fetch dashboard data:", error);
+            showNotification('Failed to load dashboard data', 'error');
         }
-    }, []);
+    }, [showNotification]);
 
     useEffect(() => {
-        fetchData();
-        const interval = setInterval(fetchData, 5000);
-        return () => clearInterval(interval);
-    }, [fetchData]);
+        if (isMounted) {
+            fetchData();
+            const interval = setInterval(fetchData, 5000);
+            return () => clearInterval(interval);
+        }
+    }, [isMounted, fetchData]);
 
     const PIE_COLORS = ['#38bdf8', '#f472b6', '#34d399', '#f59e0b', '#818cf8', '#a78bfa'];
 
     // Chart Data Processing
     const performanceData = (metrics?.pages_crawled_over_time || []).map((pages, index) => ({ time: `${index}:00`, Pages: pages, Errors: (metrics?.errors_over_time?.[index] || 0) }));
     const queueSizeData = (metrics?.queue_size_over_time || []).map((size, index) => ({ time: `${index}:00`, 'Queue Size': size }));
-    const jobStatusData = Object.entries(jobStats?.status_distribution || {}).map(([name, value], index) => ({ name, value, fill: PIE_COLORS[index % PIE_COLORS.length] }));
+    const jobStatusData = Object.entries(jobs.reduce((acc: Record<string, number>, job: CrawlJob) => {
+        acc[job.status] = (acc[job.status] || 0) + 1;
+        return acc;
+    }, {} as Record<string, number>)).map(([name, value], index) => ({ name, value, fill: PIE_COLORS[index % PIE_COLORS.length] }));
     const httpStatusData = Object.entries(metrics?.status_code_counts || {}).map(([name, value]) => ({ name: `Status ${name}`, value })).sort((a, b) => a.value - b.value);
     const contentTypeData = Object.entries(metrics?.content_type_counts || {}).map(([name, value]) => ({ name, value }));
     const totalJobs = jobStatusData.reduce((acc, cur) => acc + cur.value, 0);
     const totalActivity = metrics?.daily_crawl_heatmap?.flat().reduce((sum: number, val: number) => sum + val, 0) || 0;
-    const filteredActiveJobs = activeJobs.filter(job => job.name.toLowerCase().includes(searchQuery.toLowerCase()) || job.domain.toLowerCase().includes(searchQuery.toLowerCase()));
+    const filteredActiveJobs = jobs.filter(job => job.name.toLowerCase().includes(searchQuery.toLowerCase()) || job.domain.toLowerCase().includes(searchQuery.toLowerCase()));
 
     // Chart Theming
     const themeColors = isDarkMode
@@ -230,7 +204,7 @@ const Dashboard: React.FC = () => {
                                 <YAxis type="category" dataKey="name" stroke={themeColors.text} fontSize={10} tickLine={false} axisLine={false} width={60} />
                                 <Tooltip content={<CustomTooltip />} cursor={{ fill: isDarkMode ? 'rgba(113, 113, 122, 0.15)' : 'rgba(226, 232, 240, 0.4)' }} />
                                 <Bar dataKey="value" name="Count" radius={[0, 4, 4, 0]} barSize={12}>
-                                    {httpStatusData.map((entry, index) => <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />)}
+                                    {httpStatusData.map((_, index) => <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />)}
                                 </Bar>
                             </BarChart>
                         </ResponsiveContainer>
@@ -242,7 +216,7 @@ const Dashboard: React.FC = () => {
                             <PieChart>
                                 <Tooltip content={<CustomTooltip />} />
                                 <Pie data={contentTypeData} cx="50%" cy="50%" innerRadius="50%" outerRadius="80%" dataKey="value" paddingAngle={5}>
-                                   {contentTypeData.map((entry, index) => <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} stroke={isDarkMode ? '#18181b' : '#ffffff'} strokeWidth={2} />)}
+                                   {contentTypeData.map((_, index) => <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} stroke={isDarkMode ? '#18181b' : '#ffffff'} strokeWidth={2} />)}
                                 </Pie>
                                  <Legend iconType="circle" layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{ right: 0, fontSize: '12px' }} formatter={(value) => <span className="capitalize text-slate-600 dark:text-zinc-400">{value}</span>} />
                             </PieChart>
@@ -332,5 +306,3 @@ const Dashboard: React.FC = () => {
         </div>
     );
 };
-
-export { Dashboard };

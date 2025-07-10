@@ -1,39 +1,58 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { JobRow } from './JobRow';
+import React, { useState, useCallback, useEffect } from 'react';
+import { JobCard } from './JobCard';
+import { useDashboard } from '../contexts/DashboardContext';
 import { useApi } from '../hooks/useApi';
 import { apiService } from '../services/api';
 import type { CrawlJob } from '../types';
-import { useDashboard } from '../contexts/DashboardContext';
-import { Plus, Search, Loader2, RefreshCw, ListFilter } from 'lucide-react';
-import Card from './ui/Card';
 
 interface JobsApiResponse {
   jobs: CrawlJob[];
   count: number;
 }
 
-export const Jobs: React.FC = React.memo(() => {
-  const { isDarkMode, addNotification } = useDashboard();
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
+const Jobs: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [deleteJobId, setDeleteJobId] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedJob, setSelectedJob] = useState<CrawlJob | null>(null);
-  
-  const { data, loading, error, execute } = useApi<JobsApiResponse>(() => apiService.getJobs());
 
-  const fetchJobs = useCallback(() => {
-    execute();
+  const { showNotification } = useDashboard();
+  
+  const { data, loading, error, execute } = useApi<JobsApiResponse>();
+
+  const fetchJobs = useCallback(async () => {
+    await execute(() => apiService.getJobs());
   }, [execute]);
 
   useEffect(() => {
     fetchJobs();
-    const interval = setInterval(fetchJobs, 5000); // Refresh every 5 seconds
-    return () => clearInterval(interval);
   }, [fetchJobs]);
 
-  const handleJobAction = useCallback(async (jobId: string, action: 'start' | 'stop' | 'pause' | 'resume') => {
+  const handleCreateJob = async (jobData: Omit<CrawlJob, 'id'>) => {
+    try {
+      await apiService.createJob(jobData);
+      showNotification('Job created successfully', 'success');
+      setShowCreateModal(false);
+      fetchJobs();
+    } catch (error) {
+      showNotification('Failed to create job', 'error');
+    }
+  };
+
+  const handleDeleteJob = async (jobId: string) => {
+    try {
+      await apiService.deleteJob(jobId);
+      showNotification('Job deleted successfully', 'success');
+      setShowDeleteModal(false);
+      setSelectedJobId(null);
+      fetchJobs();
+    } catch (error) {
+      showNotification('Failed to delete job', 'error');
+    }
+  };
+
+  const handleJobAction = async (jobId: string, action: 'start' | 'stop' | 'pause' | 'resume') => {
     try {
       const apiMap = {
         start: apiService.startJob,
@@ -41,162 +60,192 @@ export const Jobs: React.FC = React.memo(() => {
         pause: apiService.pauseJob,
         resume: apiService.resumeJob,
       };
-      const response = await apiMap[action](jobId);
-      if (response.success) {
-        addNotification({ id: Date.now().toString(), message: `Job ${action}ed successfully.`, type: 'success', timestamp: new Date().toISOString() });
-        fetchJobs();
-      } else {
-        addNotification({ id: Date.now().toString(), message: `Failed to ${action} job: ${response.error}`, type: 'error', timestamp: new Date().toISOString() });
-      }
-    } catch (err) {
-      addNotification({ id: Date.now().toString(), message: `An error occurred while trying to ${action} the job.`, type: 'error', timestamp: new Date().toISOString() });
-    }
-  }, [fetchJobs, addNotification]);
-
-  const handleDeleteJob = useCallback(async (jobId: string) => {
-    setDeleting(true);
-    try {
-      await apiService.deleteJob(jobId);
-      addNotification({ id: Date.now().toString(), message: 'Job deleted successfully.', type: 'success', timestamp: new Date().toISOString() });
-      setDeleteJobId(null);
+      await apiMap[action](jobId);
+      showNotification(`Job ${action}ed successfully`, 'success');
       fetchJobs();
-    } catch (err) {
-      addNotification({ id: Date.now().toString(), message: 'Failed to delete job.', type: 'error', timestamp: new Date().toISOString() });
-    } finally {
-      setDeleting(false);
+    } catch (error) {
+      showNotification(`Failed to ${action} job`, 'error');
     }
-  }, [fetchJobs, addNotification]);
+  };
 
-  const filteredJobs = useMemo(() => (data?.jobs || [])
-    .filter(job => 
-      (job.name.toLowerCase().includes(searchQuery.toLowerCase()) || job.domain.toLowerCase().includes(searchQuery.toLowerCase())) &&
-      (filterStatus === 'all' || job.status === filterStatus)
-    ), [data, searchQuery, filterStatus]);
+  const openDeleteModal = (jobId: string) => {
+    setSelectedJobId(jobId);
+    setShowDeleteModal(true);
+  };
+
+  const openDetailsModal = (job: CrawlJob) => {
+    setSelectedJob(job);
+    setShowDetailsModal(true);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+        <p className="text-red-800">Error loading jobs: {error}</p>
+      </div>
+    );
+  }
+
+  const jobs = data?.jobs || [];
 
   return (
-    <Card>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className={`text-xl font-bold ${isDarkMode ? 'text-zinc-100' : 'text-slate-800'}`}>Crawl Jobs</h2>
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-sky-500 text-white rounded-lg hover:bg-sky-600 transition-colors shadow-md hover:shadow-lg"
-          >
-            <Plus className="w-5 h-5" />
-            New Job
-          </button>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-4 mb-6">
-        <div className="relative flex-grow sm:flex-grow-0">
-          <Search className={`absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`} />
-          <input
-            type="text"
-            placeholder="Search jobs..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className={`w-full sm:w-64 pl-11 pr-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 ${isDarkMode ? 'bg-zinc-800/80 border-zinc-700' : 'bg-white/80 border-slate-300'}`}
-          />
-        </div>
-        <div className="relative">
-            <ListFilter className={`absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 ${isDarkMode ? 'text-zinc-500' : 'text-slate-400'}`} />
-            <select 
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className={`pl-11 pr-4 py-2.5 border rounded-lg focus:outline-none appearance-none focus:ring-2 focus:ring-sky-500 ${isDarkMode ? 'bg-zinc-800/80 border-zinc-700' : 'bg-white/80 border-slate-300'}`}
-            >
-                <option value="all">All Status</option>
-                <option value="running">Running</option>
-                <option value="completed">Completed</option>
-                <option value="paused">Paused</option>
-                <option value="failed">Failed</option>
-                <option value="queued">Queued</option>
-            </select>
-        </div>
-        <button 
-          onClick={fetchJobs}
-          disabled={loading}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg transition-colors disabled:opacity-50 ${isDarkMode ? 'bg-zinc-800 text-zinc-200 hover:bg-zinc-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Crawl Jobs</h2>
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2"
         >
-          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <RefreshCw className="w-5 h-5" />}
-          <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
+          <span>Create Job</span>
         </button>
       </div>
 
-      {loading && !data && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[...Array(6)].map((_, i) => <JobCardSkeleton key={i} />)}
+      {jobs.length === 0 ? (
+        <div className="text-center py-12">
+          <p className="text-gray-500">No jobs found. Create your first job to get started.</p>
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {jobs.map((job: CrawlJob) => (
+            <JobCard
+              key={job.id}
+              job={job}
+              onAction={handleJobAction}
+              onDelete={openDeleteModal}
+              onView={openDetailsModal}
+            />
+          ))}
         </div>
       )}
 
-      {error && (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-6 text-center">
-          <p className="text-red-500 font-semibold">Error loading jobs: {error}</p>
-          <button onClick={fetchJobs} className="mt-4 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600">Retry</button>
-        </div>
+      {/* Create Job Modal */}
+      {showCreateModal && (
+        <CreateJobModal
+          onClose={() => setShowCreateModal(false)}
+          onCreated={handleCreateJob}
+        />
       )}
 
-      {!loading && !error && (
-        filteredJobs.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredJobs.map((job) => (
-              <JobCard
-                key={job.id}
-                job={job}
-                onAction={handleJobAction}
-                onDelete={() => setDeleteJobId(job.id)}
-                onView={() => setSelectedJob(job)}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <h3 className={`text-lg font-medium mb-2 ${isDarkMode ? 'text-zinc-100' : 'text-slate-800'}`}>No jobs found</h3>
-            <p className={`mb-6 ${isDarkMode ? 'text-zinc-400' : 'text-slate-500'}`}>Try adjusting your filters or create a new job.</p>
-            <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-2 px-4 py-2 bg-sky-500 text-white rounded-lg hover:bg-sky-600 mx-auto">
-              <Plus className="w-4 h-4" />
-              Create New Job
-            </button>
-          </div>
-        )
+      {/* Delete Job Modal */}
+      {showDeleteModal && selectedJobId && (
+        <DeleteJobModal
+          jobId={selectedJobId}
+          onClose={() => setShowDeleteModal(false)}
+          onConfirm={handleDeleteJob}
+          loading={loading}
+        />
       )}
 
-      {showCreateModal && <CreateJobModal onClose={() => setShowCreateModal(false)} onCreated={fetchJobs} />}
-      {deleteJobId && <DeleteJobModal jobId={deleteJobId} onClose={() => setDeleteJobId(null)} onConfirm={handleDeleteJob} loading={deleting} />}
-      {selectedJob && <JobDetailsModal job={selectedJob} onClose={() => setSelectedJob(null)} />}
-    </Card>
-  );
-});
-
-const JobCardSkeleton = () => {
-  const { isDarkMode } = useDashboard();
-  return (
-    <div className={`p-5 rounded-xl border animate-pulse ${isDarkMode ? 'bg-zinc-800/50 border-zinc-700/80' : 'bg-white/50 border-slate-200/80'}`}>
-        <div className={`h-5 rounded w-3/4 mb-3 ${isDarkMode ? 'bg-zinc-700' : 'bg-slate-200'}`}></div>
-        <div className={`h-4 rounded w-1/2 mb-5 ${isDarkMode ? 'bg-zinc-700' : 'bg-slate-200'}`}></div>
-        <div className={`h-2 rounded w-full mb-2 ${isDarkMode ? 'bg-zinc-700' : 'bg-slate-200'}`}></div>
-        <div className="flex justify-between items-center mt-4">
-            <div className={`h-8 rounded w-20 ${isDarkMode ? 'bg-zinc-700' : 'bg-slate-200'}`}></div>
-            <div className={`h-8 rounded-full w-8 ${isDarkMode ? 'bg-zinc-700' : 'bg-slate-200'}`}></div>
-        </div>
+      {/* Job Details Modal */}
+      {showDetailsModal && selectedJob && (
+        <JobDetailsModal
+          job={selectedJob}
+          onClose={() => setShowDetailsModal(false)}
+        />
+      )}
     </div>
   );
 };
 
-// Modals would be in their own files in a real app
-const CreateJobModal = ({ onClose, onCreated }: { onClose: () => void, onCreated: () => void }) => {
-    // ... modal implementation
-    return <div>Create Job Modal</div>
-}
+// Placeholder components - these would need to be implemented
+const CreateJobModal = ({ onClose, onCreated }: { onClose: () => void, onCreated: (jobData: Omit<CrawlJob, 'id'>) => void }) => {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <h3 className="text-lg font-semibold mb-4">Create New Job</h3>
+        <p className="text-gray-600 mb-4">Modal implementation needed</p>
+        <div className="flex justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 text-gray-600 hover:text-gray-800">
+            Cancel
+          </button>
+          <button onClick={() => onCreated({
+            name: 'New Job',
+            domain: 'example.com',
+            status: 'queued',
+            progress: 0,
+            pages_found: 0,
+            errors: 0,
+            start_time: null,
+            end_time: null,
+            max_depth: 3,
+            max_pages: 100,
+            scheduled: false,
+            priority: 'medium',
+            description: '',
+            tags: [],
+            data_size: '0 B',
+            avg_response_time: '0ms',
+            success_rate: 0,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })} className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+            Create
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const DeleteJobModal = ({ jobId, onClose, onConfirm, loading }: { jobId: string, onClose: () => void, onConfirm: (jobId: string) => void, loading: boolean }) => {
-    // ... modal implementation
-    return <div>Delete Job Modal</div>
-}
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <h3 className="text-lg font-semibold mb-4">Delete Job</h3>
+        <p className="text-gray-600 mb-4">Are you sure you want to delete this job?</p>
+        <div className="flex justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 text-gray-600 hover:text-gray-800">
+            Cancel
+          </button>
+          <button 
+            onClick={() => onConfirm(jobId)} 
+            disabled={loading}
+            className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 disabled:opacity-50"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const JobDetailsModal = ({ job, onClose }: { job: CrawlJob, onClose: () => void }) => {
-    // ... modal implementation
-    return <div>Job Details Modal</div>
-}
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+        <h3 className="text-lg font-semibold mb-4">Job Details</h3>
+        <div className="space-y-4">
+          <div>
+            <label className="font-medium">ID:</label>
+            <p className="text-gray-600">{job.id}</p>
+          </div>
+          <div>
+            <label className="font-medium">Status:</label>
+            <p className="text-gray-600">{job.status}</p>
+          </div>
+          <div>
+            <label className="font-medium">Created:</label>
+            <p className="text-gray-600">{new Date(job.created_at).toLocaleString()}</p>
+          </div>
+        </div>
+        <div className="flex justify-end mt-6">
+          <button onClick={onClose} className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export { Jobs };
  

@@ -3,10 +3,8 @@ import { useDashboard } from "../../contexts/DashboardContext";
 import { Sun, Moon, Bell, Menu, X } from 'lucide-react';
 
 const Header: React.FC<{
-  isSidebarMinimized: boolean;
-  setIsSidebarMinimized: (min: boolean) => void;
   onMobileNavOpen: () => void;
-}> = ({ isSidebarMinimized, setIsSidebarMinimized, onMobileNavOpen }) => {
+}> = ({ onMobileNavOpen }) => {
   const { isDarkMode, toggleDarkMode, notifications } = useDashboard();
   const [showNotifications, setShowNotifications] = useState(false);
   const notificationsRef = useRef<HTMLDivElement>(null);

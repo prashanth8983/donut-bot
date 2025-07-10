@@ -1,178 +1,257 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Calendar, Play, Pause, Trash2, X, Loader2, AlertTriangle, ChevronDown } from 'lucide-react';
+import React, { useState, useCallback, useEffect } from 'react';
+import { Plus, Calendar, Play, Pause, Loader2, AlertTriangle } from 'lucide-react';
+import { useDashboard } from '../contexts/DashboardContext';
 import { useApi } from '../hooks/useApi';
 import { apiService } from '../services/api';
-import type { ScheduledJob, CrawlerConfig } from '../types';
-import { useDashboard } from '../contexts/DashboardContext';
-import Card from './ui/Card';
+import type { ScheduledJob } from '../types';
 
 interface ScheduledJobsResponse {
   scheduled_jobs: ScheduledJob[];
   count: number;
 }
 
-export const Scheduler: React.FC = () => {
+const Scheduler: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const { data, loading, error, execute } = useApi<ScheduledJobsResponse>(apiService.getScheduledJobs);
-  const { showNotification, isDarkMode } = useDashboard();
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
-  const fetchJobs = useCallback(() => execute(), [execute]);
+  const { showNotification } = useDashboard();
+  
+  const { data, loading, error, execute } = useApi<ScheduledJobsResponse>();
+
+  const fetchJobs = useCallback(async () => {
+    await execute(() => apiService.getScheduledJobs());
+  }, [execute]);
 
   useEffect(() => {
     fetchJobs();
-    const interval = setInterval(fetchJobs, 10000); // Refresh every 10 seconds
-    return () => clearInterval(interval);
   }, [fetchJobs]);
 
-  const handleAction = async (action: 'enable' | 'disable' | 'delete', jobId: string) => {
+  const handleCreateJob = async (jobData: Omit<ScheduledJob, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
-      const apiMap = {
-        enable: apiService.enableScheduledJob,
-        disable: apiService.disableScheduledJob,
-        delete: apiService.deleteScheduledJob,
-      };
-      const response = await apiMap[action](jobId);
+      const response = await apiService.createScheduledJob(jobData);
       if (response.success) {
-        showNotification(`Scheduled job ${action}d successfully`, 'success');
+        showNotification('Scheduled job created successfully', 'success');
+        setShowCreateModal(false);
         fetchJobs();
       } else {
-        showNotification(`Failed to ${action} job: ${response.error}`, 'error');
+        showNotification('Failed to create scheduled job', 'error');
       }
-    } catch (err) {
-      showNotification(`An error occurred while attempting to ${action} the job.`, 'error');
+    } catch (error) {
+      showNotification('Failed to create scheduled job', 'error');
     }
   };
 
+  const handleDeleteJob = async (jobId: string) => {
+    setDeleting(true);
+    try {
+      const response = await apiService.deleteScheduledJob(jobId);
+      if (response.success) {
+        showNotification('Scheduled job deleted successfully', 'success');
+        setShowDeleteModal(false);
+        setSelectedJobId(null);
+        fetchJobs();
+      } else {
+        showNotification('Failed to delete scheduled job', 'error');
+      }
+    } catch (error) {
+      showNotification('Failed to delete scheduled job', 'error');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleToggleJob = async (jobId: string, enabled: boolean) => {
+    try {
+      const response = enabled 
+        ? await apiService.enableScheduledJob(jobId)
+        : await apiService.disableScheduledJob(jobId);
+      
+      if (response.success) {
+        showNotification(`Scheduled job ${enabled ? 'enabled' : 'disabled'} successfully`, 'success');
+        fetchJobs();
+      } else {
+        showNotification(`Failed to ${enabled ? 'enable' : 'disable'} scheduled job`, 'error');
+      }
+    } catch (error) {
+      showNotification(`Failed to ${enabled ? 'enable' : 'disable'} scheduled job`, 'error');
+    }
+  };
+
+  const openDeleteModal = (jobId: string) => {
+    setSelectedJobId(jobId);
+    setShowDeleteModal(true);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+        <p className="text-red-800">Error loading scheduled jobs: {error}</p>
+      </div>
+    );
+  }
+
+  const jobs = data?.scheduled_jobs || [];
+
   return (
     <div className="space-y-6">
-      <Card>
-        <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-                <Calendar className="w-7 h-7 text-sky-500" />
-                <h2 className="text-xl font-bold text-slate-800 dark:text-zinc-100">Job Scheduler</h2>
-            </div>
-            <button
-                onClick={() => setShowCreateModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-sky-500 text-white rounded-lg hover:bg-sky-600 transition-colors shadow-md hover:shadow-lg"
-            >
-                <Plus className="w-5 h-5" />
-                New Scheduled Job
-            </button>
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Scheduled Jobs</h2>
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Create Scheduled Job</span>
+        </button>
+      </div>
+
+      {jobs.length === 0 ? (
+        <div className="text-center py-12">
+          <p className="text-gray-500">No scheduled jobs found. Create your first scheduled job to get started.</p>
         </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {jobs.map((job: ScheduledJob) => {
+            const statusConfig = {
+              enabled: { color: 'green', icon: <Play/>, text: 'Enabled' },
+              disabled: { color: 'gray', icon: <Pause/>, text: 'Disabled' },
+              running: { color: 'blue', icon: <Loader2/>, text: 'Running' },
+              completed: { color: 'green', icon: <Play/>, text: 'Completed' },
+              failed: { color: 'red', icon: <AlertTriangle/>, text: 'Failed' },
+            }[job.status] || { color: 'gray', icon: <Pause/>, text: 'Unknown' };
 
-        {loading && !data && <div className="text-center py-8"><Loader2 className="w-8 h-8 animate-spin mx-auto text-sky-500" /></div>}
-        {error && 
-            <div className="text-center py-8 text-red-500 flex flex-col items-center gap-2">
-                <AlertTriangle className="w-8 h-8" />
-                <p>Error: {error}</p>
-                <button onClick={fetchJobs} className="mt-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600">Retry</button>
-            </div>
-        }
-        
-        {!loading && !error && (
-            data?.scheduled_jobs.length === 0 ? (
-                <div className="text-center py-12">
-                    <h3 className="text-lg font-medium text-slate-800 dark:text-zinc-100 mb-2">No scheduled jobs</h3>
-                    <p className="text-slate-500 dark:text-zinc-400 mb-6">Create your first scheduled job to get started.</p>
-                    <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-2 px-4 py-2 bg-sky-500 text-white rounded-lg hover:bg-sky-600 mx-auto">
-                        <Plus className="w-4 h-4" />
-                        Create Scheduled Job
-                    </button>
+            return (
+              <div key={job.id} className="border rounded-lg p-4 bg-white shadow-sm">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-lg">{job.name}</h3>
+                    <p className="text-sm text-gray-600">{job.domain}</p>
+                  </div>
+                  <div className={`flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-semibold bg-${statusConfig.color}-500/10 text-${statusConfig.color}-500`}>
+                    {React.cloneElement(statusConfig.icon, { className: 'w-3 h-3' })}
+                    <span>{statusConfig.text}</span>
+                  </div>
                 </div>
-            ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                    {data?.scheduled_jobs.map((job) => <ScheduledJobCard key={job.id} job={job} onAction={handleAction} />)}
-                </div>
-            )
-        )}
-      </Card>
 
-      {showCreateModal && <CreateJobModal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} onCreated={fetchJobs} />}
+                <div className="space-y-2 text-sm text-gray-600">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4" />
+                    <span>Schedule: {job.schedule}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span>Priority: {job.priority}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span>Category: {job.category}</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 mt-4">
+                  <button
+                    onClick={() => handleToggleJob(job.id, job.status === 'disabled')}
+                    className={`px-3 py-1 rounded text-sm ${
+                      job.status === 'disabled' 
+                        ? 'bg-green-500 text-white hover:bg-green-600' 
+                        : 'bg-gray-500 text-white hover:bg-gray-600'
+                    }`}
+                  >
+                    {job.status === 'disabled' ? 'Enable' : 'Disable'}
+                  </button>
+                  <button
+                    onClick={() => openDeleteModal(job.id)}
+                    className="px-3 py-1 rounded text-sm bg-red-500 text-white hover:bg-red-600"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Create Job Modal */}
+      {showCreateModal && (
+        <CreateJobModal
+          onClose={() => setShowCreateModal(false)}
+          onCreated={handleCreateJob}
+        />
+      )}
+
+      {/* Delete Job Modal */}
+      {showDeleteModal && selectedJobId && (
+        <DeleteJobModal
+          jobId={selectedJobId}
+          onClose={() => setShowDeleteModal(false)}
+          onConfirm={handleDeleteJob}
+          loading={deleting}
+        />
+      )}
     </div>
   );
 };
 
-const ScheduledJobCard: React.FC<{ job: ScheduledJob, onAction: (action: 'enable' | 'disable' | 'delete', jobId: string) => void }> = ({ job, onAction }) => {
-    const statusConfig = {
-        enabled: { color: 'green', icon: <Play/>, text: 'Enabled' },
-        disabled: { color: 'yellow', icon: <Pause/>, text: 'Disabled' },
-        running: { color: 'blue', icon: <Loader2 className="animate-spin"/>, text: 'Running' },
-        failed: { color: 'red', icon: <AlertTriangle/>, text: 'Failed' },
-    }[job.status];
-
-    return (
-        <Card className="flex flex-col justify-between">
-            <div>
-                <div className="flex justify-between items-start mb-3">
-                    <h3 className="text-lg font-bold text-slate-800 dark:text-zinc-100 pr-4">{job.name}</h3>
-                    <div className={`flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-semibold bg-${statusConfig.color}-500/10 text-${statusConfig.color}-500`}>
-                        {React.cloneElement(statusConfig.icon, { className: 'w-3 h-3' })}
-                        <span>{statusConfig.text}</span>
-                    </div>
-                </div>
-                <p className="text-sm text-slate-500 dark:text-zinc-400 mb-4">Domain: {job.domain}</p>
-                <div className="text-sm space-y-2 text-slate-600 dark:text-zinc-300">
-                    <p><strong>Schedule:</strong> <span className="font-mono">{job.schedule}</span></p>
-                    <p><strong>Next Run:</strong> {new Date(job.nextRun).toLocaleString()}</p>
-                    <p><strong>Last Run:</strong> {job.lastRun ? new Date(job.lastRun).toLocaleString() : 'Never'}</p>
-                </div>
-            </div>
-            <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-slate-200 dark:border-zinc-800">
-                {job.status === 'enabled' ? (
-                    <button onClick={() => onAction('disable', job.id)} className="px-3 py-1 text-sm font-semibold text-yellow-600 bg-yellow-500/20 hover:bg-yellow-500/30 rounded-md">Disable</button>
-                ) : (
-                    <button onClick={() => onAction('enable', job.id)} className="px-3 py-1 text-sm font-semibold text-green-600 bg-green-500/20 hover:bg-green-500/30 rounded-md">Enable</button>
-                )}
-                <button onClick={() => onAction('delete', job.id)} className="px-3 py-1 text-sm font-semibold text-red-600 bg-red-500/20 hover:bg-red-500/30 rounded-md">Delete</button>
-            </div>
-        </Card>
-    );
-}
-
-const CreateJobModal: React.FC<{ isOpen: boolean, onClose: () => void, onCreated: () => void }> = ({ isOpen, onClose, onCreated }) => {
-    const [formData, setFormData] = useState<Omit<ScheduledJob, 'id' | 'createdAt' | 'updatedAt' | 'status' | 'nextRun' | 'lastRun'> & { urls_list: string }>({ 
-        name: '', domain: '', schedule: '0 2 * * *', priority: 'medium', category: 'General', urls_list: '', config: {}
-    });
-    const [loading, setLoading] = useState(false);
-    const { showNotification } = useDashboard();
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setLoading(true);
-        try {
-            const jobData = { ...formData, urls: formData.urls_list.split('\n').filter(Boolean) };
-            delete (jobData as any).urls_list;
-            const response = await apiService.createScheduledJob(jobData);
-            if (response.success) {
-                showNotification('Scheduled job created successfully', 'success');
-                onCreated();
-                onClose();
-            } else {
-                showNotification(`Failed to create job: ${response.error}`, 'error');
-            }
-        } catch (err) {
-            showNotification(`An error occurred: ${(err as Error).message}`, 'error');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    if (!isOpen) return null;
-
-    return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <Card className="w-full max-w-2xl max-h-[90vh] flex flex-col">
-                <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-bold text-slate-800 dark:text-zinc-100">Create Scheduled Job</h2>
-                    <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-zinc-800"><X className="w-6 h-6 text-slate-500" /></button>
-                </div>
-                <form onSubmit={handleSubmit} className="flex-grow overflow-y-auto pr-2 space-y-4">
-                    {/* Form fields here */}
-                    <button type="submit" disabled={loading} className="w-full mt-6 py-3 bg-sky-500 text-white rounded-lg font-semibold hover:bg-sky-600 disabled:opacity-50">
-                        {loading ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : 'Create Job'}
-                    </button>
-                </form>
-            </Card>
+// Placeholder components
+const CreateJobModal = ({ onClose, onCreated }: { onClose: () => void, onCreated: (jobData: Omit<ScheduledJob, 'id' | 'createdAt' | 'updatedAt'>) => void }) => {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <h3 className="text-lg font-semibold mb-4">Create Scheduled Job</h3>
+        <p className="text-gray-600 mb-4">Modal implementation needed</p>
+        <div className="flex justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 text-gray-600 hover:text-gray-800">
+            Cancel
+          </button>
+          <button onClick={() => onCreated({
+            name: 'New Scheduled Job',
+            domain: 'example.com',
+            status: 'enabled',
+            schedule: '0 2 * * *',
+            nextRun: new Date().toISOString(),
+            priority: 'medium',
+            category: 'General',
+            config: {},
+            urls: []
+          })} className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+            Create
+          </button>
         </div>
-    );
-}; 
+      </div>
+    </div>
+  );
+};
+
+const DeleteJobModal = ({ jobId, onClose, onConfirm, loading }: { jobId: string, onClose: () => void, onConfirm: (jobId: string) => void, loading: boolean }) => {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <h3 className="text-lg font-semibold mb-4">Delete Scheduled Job</h3>
+        <p className="text-gray-600 mb-4">Are you sure you want to delete this scheduled job?</p>
+        <div className="flex justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 text-gray-600 hover:text-gray-800">
+            Cancel
+          </button>
+          <button 
+            onClick={() => onConfirm(jobId)} 
+            disabled={loading}
+            className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 disabled:opacity-50"
+          >
+            {loading ? 'Deleting...' : 'Delete'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export { Scheduler }; 
