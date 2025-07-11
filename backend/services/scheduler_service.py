@@ -11,7 +11,8 @@ from croniter import croniter
 from pymongo import ASCENDING
 from bson import ObjectId
 
-from db.database import Database, get_database
+from db.database import Database
+from db.mongodb import mongodb_client
 from db.schemas import ScheduledJobCreate, ScheduledJobUpdate, ScheduledJobResponse, ScheduledJobListResponse
 from core.logger import get_logger
 from exceptions import DatabaseError, JobNotFoundError
@@ -26,7 +27,7 @@ class SchedulerService:
     
     def __init__(self, database: Database):
         self.database = database
-        if not database.client:
+        if database.client is None:
             raise ValueError("Database client not initialized")
         self.collection = database.client.donut_bot.scheduled_jobs
         self.job_service = JobService(database)
@@ -90,6 +91,10 @@ class SchedulerService:
                 "next_run": next_run,
                 "last_run": None,
                 "priority": job_data.priority,
+                "max_pages": job_data.max_pages,
+                "max_depth": job_data.max_depth,
+                "description": job_data.description,
+                "tags": job_data.tags,
                 "created_at": datetime.now(timezone.utc),
                 "updated_at": datetime.now(timezone.utc)
             }
@@ -97,12 +102,8 @@ class SchedulerService:
             # Insert into database
             await self.collection.insert_one(job_doc)
             
-            # Convert to response model
-            job_doc["id"] = job_doc.pop("_id")
-            job_doc["createdAt"] = job_doc.pop("created_at")
-            job_doc["updatedAt"] = job_doc.pop("updated_at")
-            job_doc["nextRun"] = job_doc.pop("next_run")
-            job_doc["lastRun"] = job_doc.pop("last_run")
+            # Convert to response model - use the _id as id for the schema
+            job_doc["id"] = job_doc["_id"]  # Keep both for schema compatibility
             
             logger.info(f"Created scheduled job: {job_data.name} (ID: {job_doc['id']})")
             return ScheduledJobResponse(**job_doc)
@@ -144,11 +145,7 @@ class SchedulerService:
             
             async for doc in cursor:
                 # Convert MongoDB document to ScheduledJobResponse
-                doc["id"] = str(doc["_id"])
-                doc["createdAt"] = doc["created_at"]
-                doc["updatedAt"] = doc["updated_at"]
-                doc["nextRun"] = doc["next_run"]
-                doc["lastRun"] = doc["last_run"]
+                doc["id"] = doc["_id"]  # Keep both for schema compatibility
                 
                 job = ScheduledJobResponse(**doc)
                 jobs.append(job)
@@ -171,11 +168,7 @@ class SchedulerService:
             doc = await self.collection.find_one({"_id": job_id})
             if doc:
                 # Convert MongoDB document to ScheduledJobResponse
-                doc["id"] = str(doc["_id"])
-                doc["createdAt"] = doc["created_at"]
-                doc["updatedAt"] = doc["updated_at"]
-                doc["nextRun"] = doc["next_run"]
-                doc["lastRun"] = doc["last_run"]
+                doc["id"] = doc["_id"]  # Keep both for schema compatibility
                 
                 return ScheduledJobResponse(**doc)
             return None
@@ -435,8 +428,19 @@ async def get_scheduler_service() -> SchedulerService:
     """Get the scheduler service instance."""
     global _scheduler_service
     if _scheduler_service is None:
-        database = await get_database()
-        _scheduler_service = SchedulerService(database)
+        # Create a Database instance that wraps the mongodb_client
+        class DatabaseWrapper(Database):
+            def __init__(self, client, db):
+                self.client = client
+                self.database = db
+            
+            def get_collection(self, collection_name: str):
+                if self.database is None:
+                    raise Exception("Database not connected")
+                return self.database[collection_name]
+        
+        db = DatabaseWrapper(mongodb_client.client, mongodb_client.db)
+        _scheduler_service = SchedulerService(db)
         await _scheduler_service.initialize()
     return _scheduler_service
 
