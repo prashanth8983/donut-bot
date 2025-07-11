@@ -6,17 +6,31 @@ Provides dependency injection for services and database connections.
 from typing import Generator
 from fastapi import Depends
 
-from db.database import Database, get_database
+from db.mongodb import mongodb_client
+from db.database import Database
 from services.job_service import JobService
 from services.crawler_service import crawler_service
 
 
-async def get_job_service(db: Database = Depends(get_database)):
+async def get_job_service():
     """Dependency to get job service instance."""
     try:
         # Check if database is actually connected
-        if not db.client:
+        if mongodb_client.client is None:
             raise Exception("Database not connected")
+        
+        # Create a Database instance that wraps the mongodb_client
+        class DatabaseWrapper(Database):
+            def __init__(self, client, db):
+                self.client = client
+                self.database = db
+            
+            def get_collection(self, collection_name: str):
+                if self.database is None:
+                    raise Exception("Database not connected")
+                return self.database[collection_name]
+        
+        db = DatabaseWrapper(mongodb_client.client, mongodb_client.db)
         return JobService(db)
     except Exception as e:
         from core.logger import get_logger
@@ -36,8 +50,6 @@ async def get_job_service(db: Database = Depends(get_database)):
             async def delete_job(self, job_id: str):
                 return False
             async def start_job(self, job_id: str):
-                return False
-            async def stop_job(self, job_id: str):
                 return False
             async def resume_job(self, job_id: str):
                 return False
