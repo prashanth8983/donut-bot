@@ -23,7 +23,7 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: password123
-      MONGO_INITDB_DATABASE: webcrawler
+      MONGO_INITDB_DATABASE: donut_bot
     volumes:
       - mongodb_data:/data/db
     networks:
@@ -156,7 +156,8 @@ services:
       PYTHONUNBUFFERED: 1
       
       # MongoDB Configuration
-      MONGO_URI: mongodb://admin:password123@mongodb:27017/webcrawler?authSource=admin
+      MONGO_URI: mongodb://admin:password123@mongodb:27017/donut_bot?authSource=admin
+      DATABASE_NAME: donut_bot
       LOCAL_OUTPUT_DIR: /app/crawler_output
     volumes:
       - ./logs:/app/logs
