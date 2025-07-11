@@ -323,9 +323,45 @@ The crawler supports extensive configuration options:
 ## Development
 
 ### Running Tests
+
+The project includes two types of testing:
+
+#### 1. Unit Tests (`tests/` folder)
+Proper unit tests following Python testing conventions:
+
 ```bash
-pytest backend/tests/
+# Run unit tests with pytest
+pytest tests/
+
+# Run specific test modules
+pytest tests/services/test_jobs.py
+pytest tests/api/v1/endpoints/
 ```
+
+#### 2. Integration Tests & Utilities (`testing/` folder)
+Manual testing scripts, integration tests, and utility scripts:
+
+```bash
+# Run all integration tests
+python testing/run_all_tests.py
+
+# Run specific test categories
+python testing/api_tests/test_api_endpoints.py
+python testing/integration_tests/test_integration.py
+python testing/integration_tests/test_pause_resume.py
+python testing/frontend_tests/test_api.py
+
+# Run utility scripts (use with caution)
+python testing/run_all_tests.py --utilities
+```
+
+For detailed information about integration tests and utilities, see [testing/README.md](testing/README.md).
+
+#### Test Categories
+- **Unit Tests** (`tests/`): Proper pytest-based unit tests for individual components
+- **Integration Tests** (`testing/`): Frontend-backend communication and system integration
+- **Utility Scripts** (`testing/`): Database maintenance and data migration scripts
+- **API Tests** (`testing/`): Endpoint validation and router configuration
 
 ### Code Formatting
 ```bash

@@ -72,7 +72,7 @@ async def check_database_health(db: Database, timeout_seconds: float = 5.0) -> D
     
     try:
         # Check if database client is available
-        if not db.client:
+        if db.client is None:
             result.update({
                 "status": "unhealthy",
                 "error": "Database client not initialized",
@@ -232,7 +232,7 @@ async def readiness_check(db: Database = Depends(get_database)):
     """
     try:
         # Check if database client is available
-        if not db.client:
+        if db.client is None:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail={

@@ -503,12 +503,15 @@ class CrawlerEngine:
 
     async def get_historical_data(self, start_time: datetime, end_time: datetime) -> List[Dict[str, Any]]:
         """Retrieve historical metric snapshots within a given time range."""
-        if not self.mongodb_client or not self.mongodb_client.db:
+        if self.mongodb_client is None or self.mongodb_client.db is None:
             logger.warning("MongoDB client not initialized, returning in-memory historical data.")
             # Fallback to in-memory if MongoDB is not available
             filtered_data = []
             for snapshot in self.historical_metrics:
-                snapshot_time = datetime.fromisoformat(snapshot['timestamp']).replace(tzinfo=timezone.utc)
+                if isinstance(snapshot['timestamp'], str):
+                    snapshot_time = datetime.fromisoformat(snapshot['timestamp']).replace(tzinfo=timezone.utc)
+                else:
+                    snapshot_time = snapshot['timestamp']
                 if start_time <= snapshot_time <= end_time:
                     filtered_data.append(snapshot)
             return filtered_data

@@ -33,9 +33,21 @@ class JobService:
         if self.collection is None:
             raise DatabaseError("Database not available")
     
+    def _ensure_collection(self):
+        if self.collection is None and self.database is not None:
+            try:
+                self.collection = self.database.get_collection("jobs")
+                logger.debug(f"Collection re-acquired: {self.collection}")
+            except Exception as e:
+                logger.warning(f"Database collection not available: {e}")
+                logger.debug(f"Database state: client={self.database.client}, database={self.database.database}")
+    
     async def create_job(self, job_data: JobCreate) -> JobResponse:
         """Create a new crawl job."""
+        self._ensure_collection()
         self._check_database()
+        if self.collection is None:
+            raise DatabaseError("Database not available")
         
         try:
             # Check for duplicate job names if name is provided
@@ -89,6 +101,7 @@ class JobService:
     
     async def get_job_by_id(self, job_id: str) -> Optional[JobResponse]:
         """Get a job by ID."""
+        self._ensure_collection()
         if self.collection is None:
             logger.warning("Database not available")
             return None
@@ -139,7 +152,10 @@ class JobService:
         size: int = 100
     ) -> JobListResponse:
         """Get jobs with optional filtering and pagination."""
+        self._ensure_collection()
         self._check_database()
+        if self.collection is None:
+            raise DatabaseError("Database not available")
         try:
             # Validate pagination parameters
             if page < 1:
@@ -216,6 +232,10 @@ class JobService:
     
     async def update_job(self, job_id: str, job_data: JobUpdate) -> Optional[JobResponse]:
         """Update a job."""
+        self._ensure_collection()
+        self._check_database()
+        if self.collection is None:
+            raise DatabaseError("Database not available")
         try:
             if not job_id or not ObjectId.is_valid(job_id):
                 raise JobNotFoundError(f"Invalid job ID: {job_id}")
@@ -257,6 +277,10 @@ class JobService:
     
     async def delete_job(self, job_id: str) -> bool:
         """Delete a job."""
+        self._ensure_collection()
+        self._check_database()
+        if self.collection is None:
+            raise DatabaseError("Database not available")
         try:
             if not job_id or not ObjectId.is_valid(job_id):
                 logger.warning(f"Invalid job ID for deletion: {job_id}")
@@ -288,6 +312,10 @@ class JobService:
     
     async def start_job(self, job_id: str) -> bool:
         """Start a job."""
+        self._ensure_collection()
+        self._check_database()
+        if self.collection is None:
+            raise DatabaseError("Database not available")
         try:
             job = await self.get_job_by_id(job_id)
             if not job:
@@ -332,6 +360,13 @@ class JobService:
     
     async def stop_job(self, job_id: str) -> bool:
         """Stop a job."""
+        logger.debug(f"Stopping job {job_id}")
+        self._ensure_collection()
+        logger.debug(f"Collection after ensure: {self.collection}")
+        self._check_database()
+        if self.collection is None:
+            logger.error(f"Collection is None for job {job_id}")
+            raise DatabaseError("Database not available")
         try:
             job = await self.get_job_by_id(job_id)
             if not job:
@@ -344,7 +379,11 @@ class JobService:
             # Calculate elapsed_seconds
             elapsed = job.elapsed_seconds or 0
             if job.start_time:
-                elapsed += int((now - job.start_time).total_seconds())
+                # Ensure start_time is timezone-aware
+                start_time = job.start_time
+                if start_time.tzinfo is None:
+                    start_time = start_time.replace(tzinfo=timezone.utc)
+                elapsed += int((now - start_time).total_seconds())
             update_data = {
                 "status": "paused",
                 "end_time": now,
@@ -369,6 +408,10 @@ class JobService:
     
     async def resume_job(self, job_id: str) -> bool:
         """Resume a paused job."""
+        self._ensure_collection()
+        self._check_database()
+        if self.collection is None:
+            raise DatabaseError("Database not available")
         try:
             job = await self.get_job_by_id(job_id)
             if not job:
@@ -407,6 +450,10 @@ class JobService:
 
     async def pause_job(self, job_id: str) -> bool:
         """Pause a running job."""
+        self._ensure_collection()
+        self._check_database()
+        if self.collection is None:
+            raise DatabaseError("Database not available")
         try:
             job = await self.get_job_by_id(job_id)
             if not job:
@@ -419,7 +466,11 @@ class JobService:
             # Calculate elapsed_seconds
             elapsed = job.elapsed_seconds or 0
             if job.start_time:
-                elapsed += int((now - job.start_time).total_seconds())
+                # Ensure start_time is timezone-aware
+                start_time = job.start_time
+                if start_time.tzinfo is None:
+                    start_time = start_time.replace(tzinfo=timezone.utc)
+                elapsed += int((now - start_time).total_seconds())
             update_data = {
                 "status": "paused",
                 "end_time": now,
@@ -444,6 +495,10 @@ class JobService:
     
     async def get_job_stats(self) -> JobStats:
         """Get job statistics."""
+        self._ensure_collection()
+        self._check_database()
+        if self.collection is None:
+            raise DatabaseError("Database not available")
         try:
             pipeline = [
                 {
@@ -482,6 +537,10 @@ class JobService:
     
     async def cleanup_malformed_jobs(self) -> int:
         """Remove jobs with null _id values (malformed documents)."""
+        self._ensure_collection()
+        self._check_database()
+        if self.collection is None:
+            raise DatabaseError("Database not available")
         try:
             # Also clean up documents with other malformed fields
             malformed_filter = {
@@ -503,6 +562,10 @@ class JobService:
     
     async def complete_job(self, job_id: str, final_stats: Optional[Dict[str, Any]] = None) -> bool:
         """Mark a job as completed with optional final statistics."""
+        self._ensure_collection()
+        self._check_database()
+        if self.collection is None:
+            raise DatabaseError("Database not available")
         try:
             job = await self.get_job_by_id(job_id)
             if not job:
@@ -515,7 +578,11 @@ class JobService:
             now = datetime.now(timezone.utc)
             elapsed = job.elapsed_seconds or 0
             if job.status == "running" and job.start_time:
-                elapsed += int((now - job.start_time).total_seconds())
+                # Ensure start_time is timezone-aware
+                start_time = job.start_time
+                if start_time.tzinfo is None:
+                    start_time = start_time.replace(tzinfo=timezone.utc)
+                elapsed += int((now - start_time).total_seconds())
             update_data = {
                 "status": "completed",
                 "end_time": now,
@@ -547,6 +614,10 @@ class JobService:
     
     async def update_job_progress(self, job_id: str, progress: float, stats: Optional[Dict[str, Any]] = None) -> bool:
         """Update job progress and optional statistics."""
+        self._ensure_collection()
+        self._check_database()
+        if self.collection is None:
+            raise DatabaseError("Database not available")
         try:
             if not 0 <= progress <= 100:
                 raise ValueError("Progress must be between 0 and 100")

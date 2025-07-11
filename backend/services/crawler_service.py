@@ -14,7 +14,8 @@ from exceptions import CrawlError, ConfigurationError
 from services.kafka_service import get_kafka_service
 from services.file_storage_service import get_file_storage_service
 from services.job_service import JobService
-from db.database import database
+from db.database import Database
+from db.mongodb import mongodb_client
 from db.schemas import JobUpdate
 
 logger = get_logger("crawler_service")
@@ -42,7 +43,19 @@ class CrawlerService:
             await self.crawler_engine.initialize()
             
             # Initialize job service for progress tracking
-            self.job_service = JobService(database)
+            # Create a Database instance that wraps the mongodb_client
+            class DatabaseWrapper(Database):
+                def __init__(self, client, db):
+                    self.client = client
+                    self.database = db
+                
+                def get_collection(self, collection_name: str):
+                    if self.database is None:
+                        raise Exception("Database not connected")
+                    return self.database[collection_name]
+            
+            db = DatabaseWrapper(mongodb_client.client, mongodb_client.db)
+            self.job_service = JobService(db)
             
             # Initialize Kafka service if configured
             if config.enable_kafka_output and config.kafka_brokers and config.output_topic:

@@ -1,7 +1,7 @@
 """Utility functions for the backend."""
 
 from datetime import datetime, timezone
-from typing import Any, Dict, Union
+from typing import Any, Dict, Union, List
 
 
 def convert_datetimes(obj: Any) -> Any:
