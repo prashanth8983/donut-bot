@@ -358,53 +358,7 @@ class JobService:
             logger.error(f"Failed to start job {job_id}: {e}")
             raise DatabaseError(f"Failed to start job: {str(e)}")
     
-    async def stop_job(self, job_id: str) -> bool:
-        """Stop a job."""
-        logger.debug(f"Stopping job {job_id}")
-        self._ensure_collection()
-        logger.debug(f"Collection after ensure: {self.collection}")
-        self._check_database()
-        if self.collection is None:
-            logger.error(f"Collection is None for job {job_id}")
-            raise DatabaseError("Database not available")
-        try:
-            job = await self.get_job_by_id(job_id)
-            if not job:
-                raise JobNotFoundError(f"Job not found: {job_id}")
-            
-            if job.status != "running":
-                raise InvalidJobStateError(f"Job is not running (current status: {job.status})")
-            
-            now = datetime.now(timezone.utc)
-            # Calculate elapsed_seconds
-            elapsed = job.elapsed_seconds or 0
-            if job.start_time:
-                # Ensure start_time is timezone-aware
-                start_time = job.start_time
-                if start_time.tzinfo is None:
-                    start_time = start_time.replace(tzinfo=timezone.utc)
-                elapsed += int((now - start_time).total_seconds())
-            update_data = {
-                "status": "paused",
-                "end_time": now,
-                "updated_at": now,
-                "elapsed_seconds": elapsed
-            }
-            result = await self.collection.update_one(
-                {"_id": ObjectId(job_id)},
-                {"$set": update_data}
-            )
-            if result.modified_count > 0:
-                logger.info(f"Stopped job: {job.name} (ID: {job_id})")
-                return True
-            logger.warning(f"Failed to update job status for {job_id}")
-            return False
-            
-        except (JobNotFoundError, InvalidJobStateError):
-            raise
-        except Exception as e:
-            logger.error(f"Failed to stop job {job_id}: {e}")
-            raise DatabaseError(f"Failed to stop job: {str(e)}")
+    
     
     async def resume_job(self, job_id: str) -> bool:
         """Resume a paused job."""
@@ -492,6 +446,91 @@ class JobService:
         except Exception as e:
             logger.error(f"Failed to pause job {job_id}: {e}")
             raise DatabaseError(f"Failed to pause job: {str(e)}")
+
+    async def cancel_job(self, job_id: str) -> bool:
+        """Cancel a job."""
+        self._ensure_collection()
+        self._check_database()
+        if self.collection is None:
+            raise DatabaseError("Database not available")
+        try:
+            job = await self.get_job_by_id(job_id)
+            if not job:
+                raise JobNotFoundError(f"Job not found: {job_id}")
+
+            if job.status in ["completed", "failed", "cancelled"]:
+                raise InvalidJobStateError(f"Cannot cancel a job in status: {job.status}")
+
+            now = datetime.now(timezone.utc)
+            elapsed = job.elapsed_seconds or 0
+            if job.status == "running" and job.start_time:
+                start_time = job.start_time
+                if start_time.tzinfo is None:
+                    start_time = start_time.replace(tzinfo=timezone.utc)
+                elapsed += int((now - start_time).total_seconds())
+
+            update_data = {
+                "status": "cancelled",
+                "end_time": now,
+                "updated_at": now,
+                "elapsed_seconds": elapsed
+            }
+            result = await self.collection.update_one(
+                {"_id": ObjectId(job_id)},
+                {"$set": update_data}
+            )
+            if result.modified_count > 0:
+                logger.info(f"Cancelled job: {job.name} (ID: {job_id})")
+                return True
+            return False
+        except (JobNotFoundError, InvalidJobStateError):
+            raise
+        except Exception as e:
+            logger.error(f"Failed to cancel job {job_id}: {e}")
+            raise DatabaseError(f"Failed to cancel job: {str(e)}")
+
+    async def fail_job(self, job_id: str, error_message: str) -> bool:
+        """Mark a job as failed."""
+        self._ensure_collection()
+        self._check_database()
+        if self.collection is None:
+            raise DatabaseError("Database not available")
+        try:
+            job = await self.get_job_by_id(job_id)
+            if not job:
+                raise JobNotFoundError(f"Job not found: {job_id}")
+
+            if job.status in ["completed", "failed", "cancelled"]:
+                raise InvalidJobStateError(f"Cannot fail a job in status: {job.status}")
+
+            now = datetime.now(timezone.utc)
+            elapsed = job.elapsed_seconds or 0
+            if job.status == "running" and job.start_time:
+                start_time = job.start_time
+                if start_time.tzinfo is None:
+                    start_time = start_time.replace(tzinfo=timezone.utc)
+                elapsed += int((now - start_time).total_seconds())
+
+            update_data = {
+                "status": "failed",
+                "end_time": now,
+                "updated_at": now,
+                "elapsed_seconds": elapsed,
+                "last_error": error_message
+            }
+            result = await self.collection.update_one(
+                {"_id": ObjectId(job_id)},
+                {"$set": update_data}
+            )
+            if result.modified_count > 0:
+                logger.info(f"Failed job: {job.name} (ID: {job_id})")
+                return True
+            return False
+        except (JobNotFoundError, InvalidJobStateError):
+            raise
+        except Exception as e:
+            logger.error(f"Failed to fail job {job_id}: {e}")
+            raise DatabaseError(f"Failed to fail job: {str(e)}")
     
     async def get_job_stats(self) -> JobStats:
         """Get job statistics."""
