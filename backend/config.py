@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     
     # Server
     host: str = Field("0.0.0.0", env="HOST")
-    port: int = Field(8089, env="PORT")
+    port: int = Field(8000, env="PORT")
     
     # Database
     mongo_uri: str = Field("mongodb://localhost:27017/donut_bot", env="MONGO_URI")
@@ -55,7 +55,7 @@ class Settings(BaseSettings):
     
     # File Storage
     enable_local_save: bool = Field(True, env="ENABLE_LOCAL_SAVE")
-    local_output_dir: str = Field("/app/crawler_output", env="LOCAL_OUTPUT_DIR")
+    local_output_dir: str = Field("./crawler_output", env="LOCAL_OUTPUT_DIR")
     
     class Config:
         env_file = ".env"
