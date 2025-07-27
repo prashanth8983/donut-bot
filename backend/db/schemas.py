@@ -108,6 +108,7 @@ class JobUpdate(MongoBaseModel):
     avg_response_time: Optional[str] = Field(None)
     success_rate: Optional[float] = Field(None, ge=0.0, le=100.0)
     elapsed_seconds: Optional[int] = Field(None, ge=0, description="Total elapsed time in seconds across all runs")
+    last_error: Optional[str] = Field(None, max_length=1000, description="Last error message")
     
     @field_validator('priority')
     @classmethod
@@ -142,6 +143,7 @@ class JobResponse(JobBase):
     avg_response_time: str = Field(default="0s", description="Average response time")
     success_rate: float = Field(default=0.0, ge=0.0, le=100.0, description="Success rate percentage")
     elapsed_seconds: int = Field(default=0, ge=0, description="Total elapsed time in seconds across all runs")
+    last_error: Optional[str] = Field(default=None, description="Last error message")
     
     # Timestamps
     created_at: datetime = Field(description="Creation timestamp")
